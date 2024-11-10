@@ -35,18 +35,23 @@ public class CombatUI : MonoBehaviour
 
     public void DisplayAttackerCard(Card card)
     {
-        attackerCardSlot.sprite = card.isFaceDown ? cardBackSprite : card.sprite;
+        attackerCardSlot.sprite = card.isFaceDown ? cardBackSprite : LoadCardImage(card.imagePath);
     }
 
     public void DisplayDefenderCard(Card card)
     {
         if (card != null)
         {
-            defenderCardSlot.sprite = card.isFaceDown ? cardBackSprite : card.sprite;
+            defenderCardSlot.sprite = card.isFaceDown ? cardBackSprite : LoadCardImage(card.imagePath);
         }
         else
         {
             defenderCardSlot.sprite = null;
         }
+    }
+
+    private Sprite LoadCardImage(string imagePath)
+    {
+        return Resources.Load<Sprite>(imagePath);
     }
 }

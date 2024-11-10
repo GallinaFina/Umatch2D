@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 public class CombatManager : MonoBehaviour
 {
@@ -7,6 +8,12 @@ public class CombatManager : MonoBehaviour
     private Card attackCard;
     private Card defendCard;
     private bool isWaitingForDefender = false;
+    private CombatUI combatUI;
+
+    void Start()
+    {
+        combatUI = FindFirstObjectByType<CombatUI>();
+    }
 
     public void InitiateAttack(Card selectedCard)
     {
@@ -20,6 +27,10 @@ public class CombatManager : MonoBehaviour
         attackCard.isFaceDown = true;
         isWaitingForDefender = true;
         Debug.Log($"Attack initiated with {attackCard.name}");
+
+        combatUI.ShowCombatUI(true);
+        combatUI.UpdatePhase(CombatUI.CombatPhase.AttackerSelection);
+        combatUI.DisplayAttackerCard(attackCard);
 
         RequestEnemyDefense();
     }
@@ -54,12 +65,20 @@ public class CombatManager : MonoBehaviour
         {
             defendCard.isFaceDown = true;
             Debug.Log($"Defense declared with {defendCard.name}");
+
+            combatUI.UpdatePhase(CombatUI.CombatPhase.DefenderSelection);
+            combatUI.DisplayDefenderCard(defendCard);
         }
 
         ResolveCombat(defendCard);
     }
 
     private void ResolveCombat(Card defenseCard)
+    {
+        StartCoroutine(ResolveCombatSequence(defenseCard));
+    }
+
+    private IEnumerator ResolveCombatSequence(Card defenseCard)
     {
         Debug.Log("Beginning combat resolution");
 
@@ -70,17 +89,28 @@ public class CombatManager : MonoBehaviour
             defenseCard.isFaceDown = false;
         }
 
-        // Resolve IMMEDIATELY effects
-        ResolveEffects(CardEffectTiming.Immediately);
+        // Update UI to show revealed cards
+        combatUI.DisplayAttackerCard(attackCard);
+        combatUI.DisplayDefenderCard(defenseCard);
+        yield return new WaitForSeconds(1.5f);
 
-        // Resolve DURING COMBAT effects
+        // Immediate effects
+        combatUI.UpdatePhase(CombatUI.CombatPhase.ImmediateEffects);
+        ResolveEffects(CardEffectTiming.Immediately);
+        yield return new WaitForSeconds(1.5f);
+
+        // During combat effects
+        combatUI.UpdatePhase(CombatUI.CombatPhase.DuringCombatEffects);
         ResolveEffects(CardEffectTiming.DuringCombat);
+        yield return new WaitForSeconds(1.5f);
 
         // Compare values and determine winner
         bool attackerWins = DetermineWinner(attackCard, defenseCard);
 
-        // Resolve AFTER COMBAT effects
+        // After combat effects
+        combatUI.UpdatePhase(CombatUI.CombatPhase.AfterCombatEffects);
         ResolveEffects(CardEffectTiming.AfterCombat);
+        yield return new WaitForSeconds(2f);
 
         EndCombat(attackerWins);
     }
@@ -102,9 +132,7 @@ public class CombatManager : MonoBehaviour
 
     private bool DetermineWinner(Card attackCard, Card defenseCard)
     {
-        if (defenseCard == null) return true; // Undefended attacks always succeed
-
-        // Tie goes to defender
+        if (defenseCard == null) return true;
         return attackCard.power > defenseCard.power;
     }
 
@@ -115,6 +143,11 @@ public class CombatManager : MonoBehaviour
         attackCard = null;
         defendCard = null;
         isWaitingForDefender = false;
+
+        combatUI.ShowCombatUI(false);
+
+        // End the attacking action state
+        player.actionManager.EndAction();
 
         var turnManager = FindFirstObjectByType<TurnManager>();
         if (turnManager != null)

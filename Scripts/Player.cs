@@ -9,7 +9,7 @@ public class Player : MonoBehaviour
     private Deck deck;
     public int movement;
     public Node currentNode;
-    private ActionManager actionManager;
+    public ActionManager actionManager;
 
     public enum CombatType { Melee, Ranged }
     public CombatType combatType;
