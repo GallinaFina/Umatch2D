@@ -32,7 +32,17 @@ public class DeckManager : MonoBehaviour
                 {
                     for (int i = 0; i < card.count; i++)
                     {
-                        expandedCards.Add(new Card(card.name, card.power, card.boost, card.type, card.ability, 1, card.imagePath));
+                        CardType parsedType = (CardType)System.Enum.Parse(typeof(CardType), card.type);
+                        expandedCards.Add(new Card(
+                            card.name,
+                            card.power,
+                            card.boost,
+                            parsedType,
+                            card.ability,
+                            1,
+                            card.imagePath,
+                            card.effectTiming
+                        ));
                     }
                 }
                 deck.cards = expandedCards;
@@ -45,8 +55,6 @@ public class DeckManager : MonoBehaviour
         }
         Debug.Log("Total decks loaded: " + allDecks.Count);
     }
-
-
 
     public Deck GetDeck(string deckName)
     {

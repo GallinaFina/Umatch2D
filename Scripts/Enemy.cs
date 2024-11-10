@@ -8,6 +8,8 @@ public class Enemy : MonoBehaviour
     private Deck deck;
     public Node currentNode;
     private ActionManager actionManager;
+    public int maxHP;
+    public int currentHP;
 
     void Start()
     {
@@ -17,6 +19,8 @@ public class Enemy : MonoBehaviour
     public void Initialize(Deck chosenDeck)
     {
         deck = chosenDeck;
+        maxHP = deck.startingHealth;
+        currentHP = maxHP;
     }
 
     public void DrawCard()
@@ -52,18 +56,31 @@ public class Enemy : MonoBehaviour
 
     public Card SelectDefenseCard()
     {
+        Debug.Log($"Enemy hand contains {hand.Count} cards");
+        Debug.Log($"Hand contents: {string.Join(", ", hand.Select(c => $"{c.name} ({c.cardType})"))}");
+
         var validDefenseCards = hand.Where(card =>
             card.cardType == CardType.Defense ||
             card.cardType == CardType.Versatile).ToList();
+
+        Debug.Log($"Found {validDefenseCards.Count} valid defense cards: {string.Join(", ", validDefenseCards.Select(c => c.name))}");
 
         if (validDefenseCards.Count > 0)
         {
             int randomIndex = Random.Range(0, validDefenseCards.Count);
             Card selectedCard = validDefenseCards[randomIndex];
+            Debug.Log($"Selected {selectedCard.name} ({selectedCard.cardType}) for defense");
             DiscardCard(selectedCard);
             return selectedCard;
         }
 
+        Debug.Log("No valid defense cards found");
         return null;
+    }
+
+    public void TakeDamage(int amount)
+    {
+        currentHP -= amount;
+        Debug.Log($"{gameObject.tag} took {amount} damage. HP: {currentHP}/{maxHP}");
     }
 }

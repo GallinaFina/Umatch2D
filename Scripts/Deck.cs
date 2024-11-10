@@ -8,12 +8,14 @@ public class Deck
     public List<Card> cards;
     private const int maxCards = 30;
     public int baseMovement;
+    public int startingHealth;
 
-    public Deck(string name, List<Card> cards, int baseMovement)
+    public Deck(string name, List<Card> cards, int baseMovement, int startingHealth)
     {
         this.name = name;
         this.cards = cards;
         this.baseMovement = baseMovement;
+        this.startingHealth = startingHealth;
     }
 
     public void AddCard(Card card)

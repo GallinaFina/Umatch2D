@@ -120,13 +120,13 @@ public class CombatManager : MonoBehaviour
         if (defendCard?.effectTiming == timing)
         {
             Debug.Log($"Triggering defender's {timing} effect");
-            defendCard.OnEffectTriggered?.Invoke();
+            defendCard.TriggerEffect(enemy, player);
         }
 
         if (attackCard.effectTiming == timing)
         {
             Debug.Log($"Triggering attacker's {timing} effect");
-            attackCard.OnEffectTriggered?.Invoke();
+            attackCard.TriggerEffect(player, enemy);
         }
     }
 

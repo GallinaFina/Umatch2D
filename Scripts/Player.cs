@@ -11,6 +11,9 @@ public class Player : MonoBehaviour
     public Node currentNode;
     public ActionManager actionManager;
 
+    public int maxHP;
+    public int currentHP;
+
     public enum CombatType { Melee, Ranged }
     public CombatType combatType;
 
@@ -26,6 +29,14 @@ public class Player : MonoBehaviour
     {
         deck = chosenDeck;
         combatType = type;
+        maxHP = deck.startingHealth;
+        currentHP = maxHP;
+    }
+
+    public void TakeDamage(int amount)
+    {
+        currentHP -= amount;
+        Debug.Log($"{gameObject.tag} took {amount} damage. HP: {currentHP}/{maxHP}");
     }
 
     public void DrawCard()
