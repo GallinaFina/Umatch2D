@@ -1,0 +1,105 @@
+{
+    "name": "Bigfoot",
+    "baseMovement": 3,
+    "cards": [
+        {
+            "name": "Skirmish",
+            "power": 4,
+            "boost": 1,
+            "type": "Versatile",
+            "ability": "After combat: If you won the combat, choose one of the fighters in the combat and move them up to 2 spaces.",
+            "count": 3,
+            "imagePath": "Images/CardImages/skirmish"
+        },
+        {
+            "name": "Larger than life",
+            "power": 6,
+            "boost": 3,
+            "type": "Attack",
+            "ability": "",
+            "count": 3,
+            "imagePath": "Images/CardImages/largerthanlife"
+        },
+        {
+            "name": "Crash through the trees",
+            "power": 0,
+            "boost": 3,
+            "type": "Scheme",
+            "ability": "Move Bigfoot up to 5 spaces. You may move Bigfoot through spaces containing opposing fighters.",
+            "count": 2,
+            "imagePath": "Images/CardImages/crashthroughthetrees"
+        },
+        {
+            "name": "It's just your imagination",
+            "power": 3,
+            "boost": 3,
+            "type": "Defense",
+            "ability": "Immediately: Cancel all effects on your opponent's card.",
+            "count": 2,
+            "imagePath": "Images/CardImages/yourimagination"
+        },
+        {
+            "name": "Savagery",
+            "power": 4,
+            "boost": 3,
+            "type": "Attack",
+            "ability": "If you won the combat, deal 1 damage to each fighter adjacent to Bigfoot.",
+            "count": 3,
+            "imagePath": "Images/CardImages/savagery"
+        },
+        {
+            "name": "Hoax",
+            "power": 4,
+            "boost": 2,
+            "type": "Versatile",
+            "ability": "After combat: Move your fighter up to 5 spaces. You may move that fighter through spaces containing opposing fighters.",
+            "count": 3,
+            "imagePath": "Images/CardImages/hoax"
+        },
+        {
+            "name": "Jackalope horns",
+            "power": 0,
+            "boost": 2,
+            "type": "Scheme",
+            "ability": "Move the Jackalope up to 5 spaces. You may move the Jackalope through spaces containing opposing fighters. Then deal 2 damage to any one fighter adjacent to the Jackalope.",
+            "count": 3,
+            "imagePath": "Images/CardImages/jackalopehorns"
+        },
+        {
+            "name": "Disengage",
+            "power": 4,
+            "boost": 2,
+            "type": "Attack",
+            "ability": "After combat: Choose an empty space in this fighter's zone. Place this fighter in that space.",
+            "count": 2,
+            "imagePath": "Images/CardImages/disengage"
+        },
+        {
+            "name": "Momentous shift",
+            "power": 3,
+            "boost": 1,
+            "type": "Versatile",
+            "ability": "During combat: If your fighter started this turn in a different space, this card's value is 5 instead.",
+            "count": 3,
+            "imagePath": "Images/CardImages/momentousshift"
+        },
+        {
+            "name": "Feint",
+            "power": 2,
+            "boost": 2,
+            "type": "Versatile",
+            "ability": "Immediately: Cancel all effects on your opponent's card.",
+            "count": 3,
+            "imagePath": "Images/CardImages/feint"
+        },
+        {
+            "name": "Regroup",
+            "power": 1,
+            "boost": 2,
+            "type": "Versatile",
+            "ability": "After combat: Draw 1 card. If you won the combat, draw 2 cards instead.",
+            "count": 3,
+            "imagePath": "Images/CardImages/regroup"
+        }
+    ]
+}
