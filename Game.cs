@@ -110,6 +110,10 @@ public class Game : MonoBehaviour
 
     private void DrawInitialHand(Player player, int handSize)
     {
+        Debug.Log($"HandDisplay reference: {handDisplay != null}");
+        Debug.Log($"Player reference: {player != null}");
+        Debug.Log($"Player hand: {player.hand != null}");
+
         player.hand = new List<Card>();
         Debug.Log("Drawing initial hand for player...");
 
@@ -119,10 +123,12 @@ public class Game : MonoBehaviour
         }
 
         Debug.Log("Player's hand after initial draw: " + string.Join(", ", player.hand.Select(card => card.name)));
+        Debug.Log($"Card count in hand: {player.hand.Count}");
 
         handDisplay.DisplayHand(player.hand, OnCardDiscarded);
         Debug.Log("Displayed player's initial hand.");
     }
+
 
     private void DrawInitialHand(Enemy enemy, int handSize)
     {

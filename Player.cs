@@ -166,13 +166,35 @@ public class Player : MonoBehaviour
             var combatManager = FindFirstObjectByType<CombatManager>();
             if (combatManager != null)
             {
-                actionManager.StartAction(ActionState.Attacking);
-                combatManager.InitiateAttack(card);
+                if (card.cardType == CardType.Attack || card.cardType == CardType.Versatile)
+                {
+                    actionManager.StartAction(ActionState.Attacking);
+                    DiscardCard(card);
+                    combatManager.InitiateAttack(card);
+                }
+                else
+                {
+                    Debug.LogError("Cannot attack with this card type");
+                }
+            }
+        }
+    }
+
+
+    public void DefendAgainstAttack(Card card)
+    {
+        if (card.cardType == CardType.Defense || card.cardType == CardType.Versatile)
+        {
+            var combatManager = FindFirstObjectByType<CombatManager>();
+            if (combatManager != null)
+            {
+                DiscardCard(card);
+                combatManager.DefendWith(card);
             }
         }
         else
         {
-            Debug.LogError("Cannot attack while another action is in progress. End current action first.");
+            Debug.LogError("Cannot defend with this card type");
         }
     }
 

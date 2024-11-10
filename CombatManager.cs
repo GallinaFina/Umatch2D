@@ -1,92 +1,125 @@
 using UnityEngine;
-using System.Linq;
 
 public class CombatManager : MonoBehaviour
 {
     public Player player;
     public Enemy enemy;
-    private TurnManager turnManager;
-
-    void Start()
-    {
-        turnManager = FindFirstObjectByType<TurnManager>();
-    }
+    private Card attackCard;
+    private Card defendCard;
+    private bool isWaitingForDefender = false;
 
     public void InitiateAttack(Card selectedCard)
     {
-        if (turnManager == null || !turnManager.CanPerformAction())
-        {
-            Debug.LogError("Cannot perform action: TurnManager is null or no actions remaining.");
-            return;
-        }
-
         if (selectedCard.cardType != CardType.Attack && selectedCard.cardType != CardType.Versatile)
         {
-            Debug.LogError("Invalid card type selected for attack.");
+            Debug.LogError("Cannot attack with non-attack card type");
             return;
         }
 
-        Debug.Log("InitiateAttack called with selected card: " + selectedCard.name);
+        attackCard = selectedCard;
+        attackCard.isFaceDown = true;
+        isWaitingForDefender = true;
+        Debug.Log($"Attack initiated with {attackCard.name}");
 
-        if (CanAttack(player, enemy))
+        RequestEnemyDefense();
+    }
+
+    private void RequestEnemyDefense()
+    {
+        var defendCard = enemy.SelectDefenseCard();
+        if (defendCard != null)
         {
-            Debug.Log("Can attack enemy");
-            DefendAgainst(selectedCard, player, enemy);
-            player.DiscardCard(selectedCard);
+            DefendWith(defendCard);
+        }
+        else
+        {
+            ResolveCombat(null);
+        }
+    }
 
-            // Consume action
+    public void DefendWith(Card selectedCard)
+    {
+        if (!isWaitingForDefender) return;
+
+        if (selectedCard != null &&
+            selectedCard.cardType != CardType.Defense &&
+            selectedCard.cardType != CardType.Versatile)
+        {
+            Debug.LogError("Cannot defend with non-defense card type");
+            return;
+        }
+
+        defendCard = selectedCard;
+        if (defendCard != null)
+        {
+            defendCard.isFaceDown = true;
+            Debug.Log($"Defense declared with {defendCard.name}");
+        }
+
+        ResolveCombat(defendCard);
+    }
+
+    private void ResolveCombat(Card defenseCard)
+    {
+        Debug.Log("Beginning combat resolution");
+
+        // Reveal cards
+        attackCard.isFaceDown = false;
+        if (defenseCard != null)
+        {
+            defenseCard.isFaceDown = false;
+        }
+
+        // Resolve IMMEDIATELY effects
+        ResolveEffects(CardEffectTiming.Immediately);
+
+        // Resolve DURING COMBAT effects
+        ResolveEffects(CardEffectTiming.DuringCombat);
+
+        // Compare values and determine winner
+        bool attackerWins = DetermineWinner(attackCard, defenseCard);
+
+        // Resolve AFTER COMBAT effects
+        ResolveEffects(CardEffectTiming.AfterCombat);
+
+        EndCombat(attackerWins);
+    }
+
+    private void ResolveEffects(CardEffectTiming timing)
+    {
+        if (defendCard?.effectTiming == timing)
+        {
+            Debug.Log($"Triggering defender's {timing} effect");
+            defendCard.OnEffectTriggered?.Invoke();
+        }
+
+        if (attackCard.effectTiming == timing)
+        {
+            Debug.Log($"Triggering attacker's {timing} effect");
+            attackCard.OnEffectTriggered?.Invoke();
+        }
+    }
+
+    private bool DetermineWinner(Card attackCard, Card defenseCard)
+    {
+        if (defenseCard == null) return true; // Undefended attacks always succeed
+
+        // Tie goes to defender
+        return attackCard.power > defenseCard.power;
+    }
+
+    private void EndCombat(bool attackerWins)
+    {
+        Debug.Log($"Combat ended. Attacker {(attackerWins ? "wins!" : "loses!")}");
+
+        attackCard = null;
+        defendCard = null;
+        isWaitingForDefender = false;
+
+        var turnManager = FindFirstObjectByType<TurnManager>();
+        if (turnManager != null)
+        {
             turnManager.PerformAction(TurnManager.ActionType.Attack);
         }
-        else
-        {
-            Debug.Log("Cannot attack enemy.");
-        }
-    }
-
-    public bool CanAttack(Player attacker, Enemy enemy)
-    {
-        if (attacker.combatType == Player.CombatType.Melee)
-        {
-            return attacker.currentNode.IsConnectedTo(enemy.currentNode);
-        }
-        else if (attacker.combatType == Player.CombatType.Ranged)
-        {
-            return attacker.currentNode.zones.Intersect(enemy.currentNode.zones).Any();
-        }
-        return false;
-    }
-
-    public void DefendAgainst(Card attackCard, Player attacker, Enemy defender)
-    {
-        Card defenseCard = SelectDefenseCard(defender);
-        Debug.Log(defender.gameObject.tag + " defending with " + defenseCard.name);
-        ResolveCombat(attackCard, defenseCard, attacker, defender);
-    }
-
-    public void ResolveCombat(Card attackCard, Card defenseCard, Player attacker, Enemy defender)
-    {
-        Debug.Log("Attacker: " + attacker.gameObject.tag + " using " + attackCard.name + " (Power: " + attackCard.power + ")");
-        Debug.Log("Defender: " + defender.gameObject.tag + " using " + defenseCard.name + " (Power: " + defenseCard.power + ")");
-
-        if (attackCard.power > defenseCard.power)
-        {
-            Debug.Log(attacker.gameObject.tag + " wins the combat");
-            // Logic for attacker winning the combat
-        }
-        else if (attackCard.power < defenseCard.power)
-        {
-            Debug.Log(defender.gameObject.tag + " wins the combat");
-            // Logic for defender winning the combat
-        }
-        else
-        {
-            Debug.Log("Combat is a tie, defender wins");
-            // Logic for ties, where defender wins
-        }
-    }
-
-    public Card SelectDefenseCard(Enemy enemy)
-    {
-        return enemy.hand.FirstOrDefault(card => card.cardType == CardType.Defend || card.cardType == CardType.Versatile);
     }
 }
