@@ -1,5 +1,6 @@
 {
     "name": "Bigfoot",
+    "startingHealth": 16,
     "baseMovement": 3,
     "cards": [
         {
