@@ -64,7 +64,14 @@ public class Game : MonoBehaviour
             {
                 player.Maneuver();
                 handDisplay.DisplayHand(player.hand, player.SelectCard);
-                turnManager.PerformAction(TurnManager.ActionType.Maneuver);
+            }
+        }
+
+        if (Input.GetKeyDown(KeyCode.E))
+        {
+            if (player != null)
+            {
+                player.EndManeuver();
             }
         }
     }

@@ -19,6 +19,7 @@ public class TurnManager : MonoBehaviour
 
     public bool CanPerformAction()
     {
+        Debug.Log($"Actions remaining: {actionsRemaining}");
         return actionsRemaining > 0;
     }
 
@@ -27,7 +28,7 @@ public class TurnManager : MonoBehaviour
         if (actionsRemaining > 0)
         {
             actionsRemaining--;
-            Debug.Log("Action performed: " + actionType + ". Actions remaining: " + actionsRemaining);
+            Debug.Log($"Action performed: {actionType}. Actions remaining: {actionsRemaining}");
 
             if (actionsRemaining == 0)
             {
@@ -36,7 +37,7 @@ public class TurnManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError("No actions remaining.");
+            Debug.Log("No actions remaining to perform.");
         }
     }
 

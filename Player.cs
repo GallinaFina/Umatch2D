@@ -9,17 +9,17 @@ public class Player : MonoBehaviour
     private Deck deck;
     public int movement;
     public Node currentNode;
+    private ActionManager actionManager;
 
     public enum CombatType { Melee, Ranged }
     public CombatType combatType;
 
     private bool canBoost = false;
-
     public bool CanBoost => canBoost;
 
     void Start()
     {
-        // Initialize other components if necessary
+        actionManager = gameObject.AddComponent<ActionManager>();
     }
 
     public void Initialize(Deck chosenDeck, CombatType type)
@@ -52,29 +52,26 @@ public class Player : MonoBehaviour
 
     public void Maneuver()
     {
-        DrawCard();
-        movement = deck.baseMovement;
-        canBoost = true;
-        Debug.Log("Base movement for " + gameObject.tag + ": " + movement);
-
-        Debug.Log("Hand before display update: " + string.Join(", ", hand.Select(card => card.name)));
-
-        var handDisplay = FindFirstObjectByType<HandDisplay>();
-        if (handDisplay != null && CompareTag("Player"))
+        var turnManager = FindFirstObjectByType<TurnManager>();
+        if (actionManager.CanStartAction(ActionState.Maneuvering) && turnManager.CanPerformAction())
         {
-            var game = FindFirstObjectByType<Game>();
-            Debug.Log("HandDisplay and Game scripts found.");
-            handDisplay.DisplayHand(hand, SelectCard);
-        }
-        else
-        {
-            Debug.LogError("HandDisplay script not found or this is not the Player.");
-        }
+            actionManager.StartAction(ActionState.Maneuvering);
+            DrawCard();
+            movement = deck.baseMovement;
+            canBoost = true;
+            Debug.Log("Base movement for " + gameObject.tag + ": " + movement);
 
-        Debug.Log("Hand after maneuver: " + string.Join(", ", hand.Select(card => card.name)));
+            var handDisplay = FindFirstObjectByType<HandDisplay>();
+            if (handDisplay != null && CompareTag("Player"))
+            {
+                handDisplay.DisplayHand(hand, SelectCard);
+            }
 
-        HighlightNodesInRange();
+            HighlightNodesInRange();
+        }
     }
+
+
 
     public void DiscardCard(Card card)
     {
@@ -83,7 +80,6 @@ public class Player : MonoBehaviour
             hand.Remove(card);
             Debug.Log("Discarded: " + card.name + ". Current hand: " + string.Join(", ", hand.Select(c => c.name)));
 
-            // Update hand display
             var handDisplay = FindFirstObjectByType<HandDisplay>();
             if (handDisplay != null)
             {
@@ -94,32 +90,31 @@ public class Player : MonoBehaviour
 
     public void BoostManeuver(Card cardToDiscard)
     {
-        Debug.Log("Attempting to boost maneuver.");
-        Debug.Log("canBoost: " + canBoost);
-        Debug.Log("hand contains card: " + hand.Contains(cardToDiscard));
-
-        if (canBoost && hand.Contains(cardToDiscard))
+        if ((actionManager.currentAction == ActionState.Maneuvering ||
+             actionManager.currentAction == ActionState.BoostedManeuvering) &&
+            canBoost && hand.Contains(cardToDiscard))
         {
+            actionManager.StartAction(ActionState.BoostedManeuvering);
             DiscardCard(cardToDiscard);
             movement += cardToDiscard.boost;
             canBoost = false;
             Debug.Log("Boosted movement by: " + cardToDiscard.boost + " for " + gameObject.tag);
             HighlightNodesInRange();
         }
-        else
-        {
-            Debug.Log("Cannot boost. Either already boosted or card not in hand.");
-        }
     }
+
+
 
     public void UseSchemeCard(Card card)
     {
         var turnManager = FindFirstObjectByType<TurnManager>();
-        if (turnManager != null && turnManager.CanPerformAction())
+        if (actionManager.CanStartAction(ActionState.Scheming) && turnManager != null && turnManager.CanPerformAction())
         {
+            actionManager.StartAction(ActionState.Scheming);
             Debug.Log("Using scheme card: " + card.name);
             DiscardCard(card);
             turnManager.PerformAction(TurnManager.ActionType.Scheme);
+            actionManager.EndAction();
         }
         else
         {
@@ -136,11 +131,11 @@ public class Player : MonoBehaviour
             return;
         }
 
-        if (CanBoost)
+        if (actionManager.currentAction == ActionState.Maneuvering && CanBoost)
         {
             BoostManeuver(card);
         }
-        else
+        else if (actionManager.CanStartAction(ActionState.None))
         {
             switch (card.cardType)
             {
@@ -166,16 +161,21 @@ public class Player : MonoBehaviour
             return;
         }
 
-        var combatManager = FindFirstObjectByType<CombatManager>();
-        if (combatManager != null)
+        if (actionManager.CanStartAction(ActionState.Attacking))
         {
-            combatManager.InitiateAttack(card);
+            var combatManager = FindFirstObjectByType<CombatManager>();
+            if (combatManager != null)
+            {
+                actionManager.StartAction(ActionState.Attacking);
+                combatManager.InitiateAttack(card);
+            }
         }
         else
         {
-            Debug.LogError("CombatManager not found");
+            Debug.LogError("Cannot attack while another action is in progress. End current action first.");
         }
     }
+
 
     private void HighlightNodesInRange()
     {
@@ -203,6 +203,13 @@ public class Player : MonoBehaviour
 
     public void MoveToNode(Node targetNode, bool throughUnits = false)
     {
+        if (actionManager.currentAction != ActionState.Maneuvering &&
+            actionManager.currentAction != ActionState.BoostedManeuvering)
+        {
+            Debug.LogError("Cannot move outside of maneuver action.");
+            return;
+        }
+
         if (currentNode == null)
         {
             Debug.LogError("Current node is not set for: " + gameObject.tag);
@@ -236,12 +243,20 @@ public class Player : MonoBehaviour
             movement -= steps;
             Debug.Log(gameObject.tag + " moved to node: " + targetNode.nodeName + ". Remaining movement: " + movement);
             HighlightNodesInRange();
+
+            if (movement == 0 && actionManager.currentAction == ActionState.BoostedManeuvering)
+            {
+                EndManeuver();
+            }
         }
         else
         {
             Debug.Log(gameObject.tag + " does not have enough movement left.");
         }
     }
+
+
+
 
     private int CalculateStepsToNode(Node targetNode)
     {
@@ -276,6 +291,23 @@ public class Player : MonoBehaviour
         foreach (Node node in FindObjectsByType<Node>(FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
             node.Highlight(false);
+        }
+    }
+
+    public void EndManeuver()
+    {
+        if (actionManager.currentAction == ActionState.Maneuvering ||
+            actionManager.currentAction == ActionState.BoostedManeuvering)
+        {
+            var turnManager = FindFirstObjectByType<TurnManager>();
+            if (turnManager != null)
+            {
+                turnManager.PerformAction(TurnManager.ActionType.Maneuver);
+            }
+            actionManager.EndAction();
+            canBoost = false;
+            movement = 0;
+            ResetHighlights();
         }
     }
 }
