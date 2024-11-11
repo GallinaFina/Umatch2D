@@ -5,8 +5,8 @@ public class CombatManager : MonoBehaviour
 {
     public Player player;
     public Enemy enemy;
-    private Card attackCard;
-    private Card defendCard;
+    public Card attackCard;
+    public Card defendCard;
     private bool isWaitingForDefender = false;
     private CombatUI combatUI;
 
@@ -107,6 +107,13 @@ public class CombatManager : MonoBehaviour
         // Compare values and determine winner
         bool attackerWins = DetermineWinner(attackCard, defenseCard);
 
+        if (attackerWins)
+        {
+            int damageDifference = attackCard.power - (defenseCard?.power ?? 0);
+            enemy.TakeDamage(damageDifference);
+            Debug.Log($"Enemy takes {damageDifference} damage from power difference");
+        }
+
         // After combat effects
         combatUI.UpdatePhase(CombatUI.CombatPhase.AfterCombatEffects);
         ResolveEffects(CardEffectTiming.AfterCombat);
@@ -117,6 +124,10 @@ public class CombatManager : MonoBehaviour
 
     private void ResolveEffects(CardEffectTiming timing)
     {
+        Debug.Log($"ResolveEffects called with timing: {timing}");
+        Debug.Log($"Attacker card: {attackCard.name}, Effect timing: {attackCard.effectTiming}");
+        Debug.Log($"Defender card: {defendCard?.name}, Effect timing: {defendCard?.effectTiming}");
+
         if (defendCard?.effectTiming == timing)
         {
             Debug.Log($"Triggering defender's {timing} effect");
@@ -130,7 +141,7 @@ public class CombatManager : MonoBehaviour
         }
     }
 
-    private bool DetermineWinner(Card attackCard, Card defenseCard)
+    public bool DetermineWinner(Card attackCard, Card defenseCard)
     {
         if (defenseCard == null) return true;
         return attackCard.power > defenseCard.power;

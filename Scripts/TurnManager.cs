@@ -8,12 +8,13 @@ public class TurnManager : MonoBehaviour
 
     void Start()
     {
-        StartPlayerTurn();
+        
     }
 
     public void StartPlayerTurn()
     {
         actionsRemaining = 4;
+        player.SetStartingNode();
         Debug.Log("Player's turn started. Actions remaining: " + actionsRemaining);
     }
 

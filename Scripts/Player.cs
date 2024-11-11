@@ -6,9 +6,10 @@ public class Player : MonoBehaviour
 {
     [SerializeField]
     public List<Card> hand;
-    private Deck deck;
+    public Deck deck;
     public int movement;
     public Node currentNode;
+    public Node startingNode;
     public ActionManager actionManager;
 
     public int maxHP;
@@ -33,7 +34,18 @@ public class Player : MonoBehaviour
         currentHP = maxHP;
     }
 
-    public void TakeDamage(int amount)
+    public void SetStartingNode()
+    {
+        startingNode = currentNode;
+    }
+
+    public Node GetStartingNode()
+    {
+        return startingNode;
+    }
+
+
+public void TakeDamage(int amount)
     {
         currentHP -= amount;
         Debug.Log($"{gameObject.tag} took {amount} damage. HP: {currentHP}/{maxHP}");
@@ -210,7 +222,7 @@ public class Player : MonoBehaviour
     }
 
 
-    private void HighlightNodesInRange()
+    public void HighlightNodesInRange()
     {
         ResetHighlights();
 

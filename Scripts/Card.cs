@@ -33,41 +33,10 @@ public class Card
 
     public void TriggerEffect(MonoBehaviour source, MonoBehaviour target)
     {
-        switch (effectTiming)
-        {
-            case CardEffectTiming.Immediately:
-                HandleImmediateEffect(source, target);
-                break;
-            case CardEffectTiming.DuringCombat:
-                HandleDuringCombatEffect(source, target);
-                break;
-            case CardEffectTiming.AfterCombat:
-                HandleAfterCombatEffect(source, target);
-                break;
-        }
-
-        OnEffectTriggered?.Invoke();
+        Debug.Log($"Triggering {effectTiming} effect for {name}");
+        EffectManager.Instance.ResolveCardEffect(this, source, target);
     }
 
-    private void HandleImmediateEffect(MonoBehaviour source, MonoBehaviour target)
-    {
-        Debug.Log($"Triggering immediate effect for {name}");
-    }
 
-    private void HandleDuringCombatEffect(MonoBehaviour source, MonoBehaviour target)
-    {
-        Debug.Log($"Triggering during combat effect for {name}");
-        if (cardType == CardType.Attack || cardType == CardType.Versatile)
-        {
-            if (target is Player playerTarget)
-                playerTarget.TakeDamage(power);
-            else if (target is Enemy enemyTarget)
-                enemyTarget.TakeDamage(power);
-        }
-    }
 
-    private void HandleAfterCombatEffect(MonoBehaviour source, MonoBehaviour target)
-    {
-        Debug.Log($"Triggering after combat effect for {name}");
-    }
 }

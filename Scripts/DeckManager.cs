@@ -26,13 +26,15 @@ public class DeckManager : MonoBehaviour
                 Debug.Log("Loaded deck: " + deck.name + " with baseMovement: " + deck.baseMovement);
 
                 List<Card> originalCards = new List<Card>(deck.cards);
-
                 List<Card> expandedCards = new List<Card>();
+
                 foreach (Card card in originalCards)
                 {
                     for (int i = 0; i < card.count; i++)
                     {
                         CardType parsedType = (CardType)System.Enum.Parse(typeof(CardType), card.type);
+                        CardEffectTiming timing = DetermineEffectTiming(card.ability);
+
                         expandedCards.Add(new Card(
                             card.name,
                             card.power,
@@ -41,7 +43,7 @@ public class DeckManager : MonoBehaviour
                             card.ability,
                             1,
                             card.imagePath,
-                            card.effectTiming
+                            timing
                         ));
                     }
                 }
@@ -54,6 +56,20 @@ public class DeckManager : MonoBehaviour
             }
         }
         Debug.Log("Total decks loaded: " + allDecks.Count);
+    }
+
+    private CardEffectTiming DetermineEffectTiming(string ability)
+    {
+        if (string.IsNullOrEmpty(ability)) return CardEffectTiming.None;
+
+        if (ability.StartsWith("Immediately:"))
+            return CardEffectTiming.Immediately;
+        if (ability.StartsWith("During combat:"))
+            return CardEffectTiming.DuringCombat;
+        if (ability.StartsWith("After combat:"))
+            return CardEffectTiming.AfterCombat;
+
+        return CardEffectTiming.None;
     }
 
     public Deck GetDeck(string deckName)

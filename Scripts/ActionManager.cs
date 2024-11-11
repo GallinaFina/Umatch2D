@@ -2,7 +2,7 @@ using UnityEngine;
 
 public class ActionManager : MonoBehaviour
 {
-    public ActionState currentAction { get; private set; } = ActionState.None;
+    public ActionState currentAction { get; set; } = ActionState.None;
 
     public bool CanStartAction(ActionState newAction)
     {
