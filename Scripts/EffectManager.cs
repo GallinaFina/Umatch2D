@@ -44,38 +44,61 @@ public class EffectManager : MonoBehaviour
     {
         Debug.Log($"Resolving effect for {card.name} with timing {card.effectTiming}");
 
-        bool wonCombat = false;
-        var combatManager = FindFirstObjectByType<CombatManager>();
-        if (combatManager != null)
-        {
-            wonCombat = source is Player ?
-                combatManager.DetermineWinner(combatManager.attackCard, combatManager.defendCard) :
-                !combatManager.DetermineWinner(combatManager.attackCard, combatManager.defendCard);
-        }
-
         string methodName = card.name.Replace(" ", "");
+        Debug.Log($"Looking for method: {methodName}");
+
         var method = typeof(BigfootCardEffects).GetMethod(methodName);
         if (method != null)
         {
+            Debug.Log($"Found method {methodName}, executing...");
+            bool wonCombat = DetermineWonCombat(source);
             method.Invoke(null, new object[] { card, source, wonCombat });
         }
+        else
+        {
+            Debug.LogError($"Method {methodName} not found in BigfootCardEffects");
+        }
+    }
+
+    private bool DetermineWonCombat(MonoBehaviour source)
+    {
+        var combatManager = FindFirstObjectByType<CombatManager>();
+        if (combatManager != null)
+        {
+            if (source is Player)
+            {
+                return combatManager.DetermineWinner(combatManager.attackCard, combatManager.defendCard);
+            }
+            else
+            {
+                return !combatManager.DetermineWinner(combatManager.attackCard, combatManager.defendCard);
+            }
+        }
+        return false;
     }
 
 
 
-    public void DrawCards(Player player, int amount)
+    public void DrawCards(MonoBehaviour target, int amount)
     {
         for (int i = 0; i < amount; i++)
         {
-            player.DrawCard();
+            if (target is Player p)
+                p.DrawCard();
+            else if (target is Enemy enemy)
+                enemy.DrawCard();
         }
 
-        var handDisplay = FindFirstObjectByType<HandDisplay>();
-        if (handDisplay != null && player.CompareTag("Player"))
+        if (target is Player player)
         {
-            handDisplay.DisplayHand(player.hand, player.SelectCard);
+            var handDisplay = FindFirstObjectByType<HandDisplay>();
+            if (handDisplay != null)
+            {
+                handDisplay.DisplayHand(player.hand, player.SelectCard);
+            }
         }
     }
+
 
     public void CancelEffects(Card targetCard)
     {
@@ -85,12 +108,14 @@ public class EffectManager : MonoBehaviour
 
     public void MovePlayer(Player player, int maxSpaces, bool throughUnits = false)
     {
+        // Instead of directly setting currentAction, we should use ActionManager's methods
         var originalAction = player.actionManager.currentAction;
-        player.actionManager.currentAction = ActionState.Maneuvering;
+        player.actionManager.StartAction(ActionState.Maneuvering);
         player.movement = maxSpaces;
         player.MoveToNode(player.currentNode, throughUnits);
-        player.actionManager.currentAction = originalAction;
+        player.actionManager.StartAction(originalAction);
     }
+
 
     public void ModifyCardPower(Card card, int newPower)
     {

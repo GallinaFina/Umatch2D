@@ -76,19 +76,18 @@ public class Game : MonoBehaviour
         }
     }
 
-
     public void OnCardDiscarded(Card card)
     {
         player.BoostManeuver(card);
         handDisplay.DisplayHand(player.hand, OnCardDiscarded);
     }
 
-
     private void InitializePlayer(Player player, string startNodeName, Player.CombatType type)
     {
         Deck chosenDeck = deckManager.GetDeck("Bigfoot");
         player.Initialize(chosenDeck, type);
         player.currentNode = board.GetNodeByName(startNodeName);
+        player.SetStartingNode();
 
         if (player.currentNode == null)
         {
@@ -101,6 +100,7 @@ public class Game : MonoBehaviour
         Deck chosenDeck = deckManager.GetDeck("Bigfoot");
         enemy.Initialize(chosenDeck);
         enemy.currentNode = board.GetNodeByName(startNodeName);
+        enemy.SetStartingNode();
 
         if (enemy.currentNode == null)
         {
@@ -128,7 +128,6 @@ public class Game : MonoBehaviour
         handDisplay.DisplayHand(player.hand, OnCardDiscarded);
         Debug.Log("Displayed player's initial hand.");
     }
-
 
     private void DrawInitialHand(Enemy enemy, int handSize)
     {

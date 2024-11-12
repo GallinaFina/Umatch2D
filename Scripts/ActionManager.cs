@@ -3,11 +3,36 @@ using UnityEngine;
 public class ActionManager : MonoBehaviour
 {
     public ActionState currentAction { get; set; } = ActionState.None;
+    private TurnManager turnManager;
 
-    public bool CanStartAction(ActionState newAction)
+    private void Start()
     {
-        Debug.Log($"Attempting to start {newAction}. Current action: {currentAction}");
-        return currentAction == ActionState.None;
+        turnManager = FindFirstObjectByType<TurnManager>();
+    }
+
+    public bool CanPerformAction(ActionState newAction)
+    {
+        if (!turnManager.CanPerformAction())
+            return false;
+
+        switch (newAction)
+        {
+            case ActionState.None:
+                return true;
+
+            case ActionState.Attacking:
+            case ActionState.Scheming:
+                return currentAction == ActionState.None;
+
+            case ActionState.Maneuvering:
+                return currentAction == ActionState.None;
+
+            case ActionState.BoostedManeuvering:
+                return currentAction == ActionState.Maneuvering;
+
+            default:
+                return false;
+        }
     }
 
     public void StartAction(ActionState action)

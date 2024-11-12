@@ -37,6 +37,4 @@ public class Card
         EffectManager.Instance.ResolveCardEffect(this, source, target);
     }
 
-
-
 }

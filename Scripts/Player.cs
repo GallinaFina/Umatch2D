@@ -44,8 +44,7 @@ public class Player : MonoBehaviour
         return startingNode;
     }
 
-
-public void TakeDamage(int amount)
+    public void TakeDamage(int amount)
     {
         currentHP -= amount;
         Debug.Log($"{gameObject.tag} took {amount} damage. HP: {currentHP}/{maxHP}");
@@ -75,8 +74,7 @@ public void TakeDamage(int amount)
 
     public void Maneuver()
     {
-        var turnManager = FindFirstObjectByType<TurnManager>();
-        if (actionManager.CanStartAction(ActionState.Maneuvering) && turnManager.CanPerformAction())
+        if (actionManager.CanPerformAction(ActionState.Maneuvering))
         {
             actionManager.StartAction(ActionState.Maneuvering);
             DrawCard();
@@ -93,8 +91,6 @@ public void TakeDamage(int amount)
             HighlightNodesInRange();
         }
     }
-
-
 
     public void DiscardCard(Card card)
     {
@@ -113,9 +109,7 @@ public void TakeDamage(int amount)
 
     public void BoostManeuver(Card cardToDiscard)
     {
-        if ((actionManager.currentAction == ActionState.Maneuvering ||
-             actionManager.currentAction == ActionState.BoostedManeuvering) &&
-            canBoost && hand.Contains(cardToDiscard))
+        if (actionManager.CanPerformAction(ActionState.BoostedManeuvering) && canBoost && hand.Contains(cardToDiscard))
         {
             actionManager.StartAction(ActionState.BoostedManeuvering);
             DiscardCard(cardToDiscard);
@@ -126,55 +120,47 @@ public void TakeDamage(int amount)
         }
     }
 
-
-
     public void UseSchemeCard(Card card)
     {
-        var turnManager = FindFirstObjectByType<TurnManager>();
-        if (actionManager.CanStartAction(ActionState.Scheming) && turnManager != null && turnManager.CanPerformAction())
+        if (actionManager.CanPerformAction(ActionState.Scheming))
         {
             actionManager.StartAction(ActionState.Scheming);
             Debug.Log("Using scheme card: " + card.name);
             DiscardCard(card);
-            turnManager.PerformAction(TurnManager.ActionType.Scheme);
+            var turnManager = FindFirstObjectByType<TurnManager>();
+            if (turnManager != null)
+            {
+                turnManager.PerformAction(TurnManager.ActionType.Scheme);
+            }
             actionManager.EndAction();
-        }
-        else
-        {
-            Debug.LogError("No actions remaining to use a scheme card.");
         }
     }
 
     public void SelectCard(Card card)
     {
         var turnManager = FindFirstObjectByType<TurnManager>();
-        if (turnManager != null && !turnManager.CanPerformAction() && card.cardType == CardType.Scheme)
-        {
-            Debug.LogError("No actions remaining to use a scheme card.");
-            return;
-        }
 
         if (actionManager.currentAction == ActionState.Maneuvering && CanBoost)
         {
             BoostManeuver(card);
+            return;
         }
-        else if (actionManager.CanStartAction(ActionState.None))
+
+        switch (card.cardType)
         {
-            switch (card.cardType)
-            {
-                case CardType.Attack:
-                case CardType.Versatile:
+            case CardType.Attack:
+            case CardType.Versatile:
+                if (actionManager.CanPerformAction(ActionState.Attacking))
                     SelectCardForAttack(card);
-                    break;
-                case CardType.Scheme:
+                break;
+
+            case CardType.Scheme:
+                if (turnManager.CanPerformAction())
                     UseSchemeCard(card);
-                    break;
-                default:
-                    Debug.LogError("Unknown card type: " + card.cardType);
-                    break;
-            }
+                break;
         }
     }
+
 
     private void SelectCardForAttack(Card card)
     {
@@ -184,25 +170,21 @@ public void TakeDamage(int amount)
             return;
         }
 
-        if (actionManager.CanStartAction(ActionState.Attacking))
+        var combatManager = FindFirstObjectByType<CombatManager>();
+        if (combatManager != null)
         {
-            var combatManager = FindFirstObjectByType<CombatManager>();
-            if (combatManager != null)
+            if (card.cardType == CardType.Attack || card.cardType == CardType.Versatile)
             {
-                if (card.cardType == CardType.Attack || card.cardType == CardType.Versatile)
-                {
-                    actionManager.StartAction(ActionState.Attacking);
-                    DiscardCard(card);
-                    combatManager.InitiateAttack(card);
-                }
-                else
-                {
-                    Debug.LogError("Cannot attack with this card type");
-                }
+                actionManager.StartAction(ActionState.Attacking);
+                DiscardCard(card);
+                combatManager.InitiateAttack(card);
+            }
+            else
+            {
+                Debug.LogError("Cannot attack with this card type");
             }
         }
     }
-
 
     public void DefendAgainstAttack(Card card)
     {
@@ -220,7 +202,6 @@ public void TakeDamage(int amount)
             Debug.LogError("Cannot defend with this card type");
         }
     }
-
 
     public void HighlightNodesInRange()
     {
@@ -248,13 +229,6 @@ public void TakeDamage(int amount)
 
     public void MoveToNode(Node targetNode, bool throughUnits = false)
     {
-        if (actionManager.currentAction != ActionState.Maneuvering &&
-            actionManager.currentAction != ActionState.BoostedManeuvering)
-        {
-            Debug.LogError("Cannot move outside of maneuver action.");
-            return;
-        }
-
         if (currentNode == null)
         {
             Debug.LogError("Current node is not set for: " + gameObject.tag);
@@ -299,8 +273,6 @@ public void TakeDamage(int amount)
             Debug.Log(gameObject.tag + " does not have enough movement left.");
         }
     }
-
-
 
 
     private int CalculateStepsToNode(Node targetNode)

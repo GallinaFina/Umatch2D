@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
 
 public class CombatManager : MonoBehaviour
 {
@@ -78,6 +79,13 @@ public class CombatManager : MonoBehaviour
         StartCoroutine(ResolveCombatSequence(defenseCard));
     }
 
+    private readonly List<(CardEffectTiming timing, string phase)> combatSequence = new List<(CardEffectTiming, string)>
+{
+    (CardEffectTiming.Immediately, "ImmediateEffects"),
+    (CardEffectTiming.DuringCombat, "DuringCombatEffects"),
+    (CardEffectTiming.AfterCombat, "AfterCombatEffects")
+};
+
     private IEnumerator ResolveCombatSequence(Card defenseCard)
     {
         Debug.Log("Beginning combat resolution");
@@ -104,7 +112,7 @@ public class CombatManager : MonoBehaviour
         ResolveEffects(CardEffectTiming.DuringCombat);
         yield return new WaitForSeconds(1.5f);
 
-        // Compare values and determine winner
+        // Compare values and determine winner AFTER effects
         bool attackerWins = DetermineWinner(attackCard, defenseCard);
 
         if (attackerWins)
@@ -122,6 +130,7 @@ public class CombatManager : MonoBehaviour
         EndCombat(attackerWins);
     }
 
+
     private void ResolveEffects(CardEffectTiming timing)
     {
         Debug.Log($"ResolveEffects called with timing: {timing}");
@@ -131,15 +140,16 @@ public class CombatManager : MonoBehaviour
         if (defendCard?.effectTiming == timing)
         {
             Debug.Log($"Triggering defender's {timing} effect");
-            defendCard.TriggerEffect(enemy, player);
+            defendCard.TriggerEffect(enemy, player);  // Use enemy as source for defender
         }
 
         if (attackCard.effectTiming == timing)
         {
             Debug.Log($"Triggering attacker's {timing} effect");
-            attackCard.TriggerEffect(player, enemy);
+            attackCard.TriggerEffect(player, enemy);  // Use player as source for attacker
         }
     }
+
 
     public bool DetermineWinner(Card attackCard, Card defenseCard)
     {

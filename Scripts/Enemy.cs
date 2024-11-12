@@ -7,6 +7,7 @@ public class Enemy : MonoBehaviour
     public List<Card> hand;
     private Deck deck;
     public Node currentNode;
+    public Node startingNode;
     private ActionManager actionManager;
     public int maxHP;
     public int currentHP;
@@ -21,6 +22,17 @@ public class Enemy : MonoBehaviour
         deck = chosenDeck;
         maxHP = deck.startingHealth;
         currentHP = maxHP;
+        SetStartingNode();
+    }
+
+    public void SetStartingNode()
+    {
+        startingNode = currentNode;
+    }
+
+    public Node GetStartingNode()
+    {
+        return startingNode;
     }
 
     public void DrawCard()
