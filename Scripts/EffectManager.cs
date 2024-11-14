@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Collections;
 
 public class EffectManager : MonoBehaviour
 {
@@ -39,26 +40,40 @@ public class EffectManager : MonoBehaviour
         }
     }
 
-
     public void ResolveCardEffect(Card card, MonoBehaviour source, MonoBehaviour target)
     {
         Debug.Log($"Resolving effect for {card.name} with timing {card.effectTiming}");
 
-        string methodName = card.name.Replace(" ", "");
-        Debug.Log($"Looking for method: {methodName}");
+        // Get the character's deck name from the source
+        string deckName = "";
+        if (source is Player player)
+            deckName = player.deck.name;
+        else if (source is Enemy enemy)
+            deckName = enemy.deck.name;
 
-        var method = typeof(BigfootCardEffects).GetMethod(methodName);
-        if (method != null)
+        // Construct the effect library class name
+        string effectLibrary = $"{deckName}CardEffects";
+        Debug.Log($"Looking for method: {card.name.Replace(" ", "").Replace("'", "")} in {effectLibrary}");
+
+        // Get the effect library type dynamically
+        var libraryType = System.Type.GetType(effectLibrary);
+        if (libraryType != null)
         {
-            Debug.Log($"Found method {methodName}, executing...");
-            bool wonCombat = DetermineWonCombat(source);
-            method.Invoke(null, new object[] { card, source, wonCombat });
-        }
-        else
-        {
-            Debug.LogError($"Method {methodName} not found in BigfootCardEffects");
+            var method = libraryType.GetMethod(card.name.Replace(" ", "").Replace("'", ""));
+            if (method != null)
+            {
+                Debug.Log($"Found method {card.name.Replace(" ", "")}, executing...");
+                bool wonCombat = DetermineWonCombat(source);
+                method.Invoke(null, new object[] { card, source, wonCombat });
+            }
+            else
+            {
+                Debug.LogError($"Method {card.name.Replace(" ", "")} not found in {effectLibrary}");
+            }
         }
     }
+
+
 
     private bool DetermineWonCombat(MonoBehaviour source)
     {
@@ -76,8 +91,6 @@ public class EffectManager : MonoBehaviour
         }
         return false;
     }
-
-
 
     public void DrawCards(MonoBehaviour target, int amount)
     {
@@ -99,22 +112,64 @@ public class EffectManager : MonoBehaviour
         }
     }
 
-
     public void CancelEffects(Card targetCard)
     {
         Debug.Log($"Canceling effects on {targetCard.name}");
         targetCard.effectTiming = CardEffectTiming.None;
     }
 
-    public void MovePlayer(Player player, int maxSpaces, bool throughUnits = false)
+    public void MovePlayer(MonoBehaviour unit, int maxSpaces, bool throughUnits = false)
     {
-        // Instead of directly setting currentAction, we should use ActionManager's methods
-        var originalAction = player.actionManager.currentAction;
-        player.actionManager.StartAction(ActionState.Maneuvering);
-        player.movement = maxSpaces;
-        player.MoveToNode(player.currentNode, throughUnits);
-        player.actionManager.StartAction(originalAction);
+        Debug.Log($"Setting up movement for {unit.gameObject.name} with {maxSpaces} spaces");
+
+        // Store original action state
+        var originalAction = unit is Player player ?
+            player.actionManager.currentAction :
+            ((Enemy)unit).actionManager.currentAction;
+        Debug.Log($"Original action state: {originalAction}");
+
+        // Set up movement state
+        if (unit is Player selectedPlayer)
+        {
+            selectedPlayer.actionManager.StartAction(ActionState.Maneuvering);
+            selectedPlayer.movement = maxSpaces;
+            selectedPlayer.HighlightNodesInRange();
+            Debug.Log($"Player movement set to: {selectedPlayer.movement}, Action state: {selectedPlayer.actionManager.currentAction}");
+        }
+        else if (unit is Enemy selectedEnemy)
+        {
+            selectedEnemy.actionManager.StartAction(ActionState.Maneuvering);
+            selectedEnemy.movement = maxSpaces;
+            selectedEnemy.HighlightNodesInRange();
+            Debug.Log($"Enemy movement set to: {selectedEnemy.movement}, Action state: {selectedEnemy.actionManager.currentAction}");
+        }
+
+        Debug.Log($"Movement setup completed for {unit.gameObject.name}");
     }
+
+
+    private IEnumerator HandleForcedMovement(MonoBehaviour unit, ActionState originalAction)
+    {
+        if (unit is Player player)
+        {
+            player.HighlightNodesInRange();
+            while (player.movement > 0)
+            {
+                yield return null;
+            }
+            player.actionManager.StartAction(originalAction);
+        }
+        else if (unit is Enemy enemy)
+        {
+            enemy.HighlightNodesInRange();
+            while (enemy.movement > 0)
+            {
+                yield return null;
+            }
+            enemy.actionManager.StartAction(originalAction);
+        }
+    }
+
 
 
     public void ModifyCardPower(Card card, int newPower)

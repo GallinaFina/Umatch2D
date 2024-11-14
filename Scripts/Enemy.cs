@@ -5,12 +5,14 @@ using System.Linq;
 public class Enemy : MonoBehaviour
 {
     public List<Card> hand;
-    private Deck deck;
+    public Deck deck;
     public Node currentNode;
     public Node startingNode;
-    private ActionManager actionManager;
+    public ActionManager actionManager;
     public int maxHP;
     public int currentHP;
+    public int movement;
+    public SpriteRenderer characterPortrait;
 
     void Start()
     {
@@ -23,11 +25,25 @@ public class Enemy : MonoBehaviour
         maxHP = deck.startingHealth;
         currentHP = maxHP;
         SetStartingNode();
+        Debug.Log($"Enemy Initialize - Current Node before SetStartingNode: {currentNode?.nodeName}");
+        SetStartingNode();
+        Debug.Log($"Enemy Initialize - Current Node after SetStartingNode: {currentNode?.nodeName}");
+    
+    string portraitPath = "Images/Portraits/" + chosenDeck.name;
+        Sprite portrait = Resources.Load<Sprite>(portraitPath);
+        if (portrait != null && characterPortrait != null)
+        {
+            characterPortrait.sprite = portrait;
+        }
+    
     }
 
     public void SetStartingNode()
     {
+        Debug.Log($"Enemy SetStartingNode - Current Node before set: {currentNode?.nodeName}");
         startingNode = currentNode;
+        Debug.Log($"Enemy SetStartingNode - Starting Node after set: {startingNode?.nodeName}");
+        Debug.Log($"Enemy SetStartingNode - Node connections: {string.Join(", ", currentNode?.connections.Select(n => n.nodeName) ?? new string[] { "none" })}");
     }
 
     public Node GetStartingNode()
@@ -56,6 +72,18 @@ public class Enemy : MonoBehaviour
             Debug.Log(gameObject.tag + " hand is full!");
         }
     }
+
+    public void EndManeuver()
+    {
+        if (actionManager.currentAction == ActionState.Maneuvering ||
+            actionManager.currentAction == ActionState.BoostedManeuvering)
+        {
+            actionManager.EndAction();
+            movement = 0;
+            ResetHighlights();
+        }
+    }
+
 
     public void DiscardCard(Card card)
     {
@@ -94,5 +122,115 @@ public class Enemy : MonoBehaviour
     {
         currentHP -= amount;
         Debug.Log($"{gameObject.tag} took {amount} damage. HP: {currentHP}/{maxHP}");
+    }
+
+    public void HighlightNodesInRange()
+    {
+        Debug.Log($"Enemy attempting to highlight nodes. Current node: {currentNode?.nodeName}, Movement: {movement}");
+        Debug.Log($"Current node connections: {string.Join(", ", currentNode.connections.Select(n => n.nodeName))}");
+        ResetHighlights();
+
+        Queue<(Node, int)> queue = new Queue<(Node, int)>();
+        HashSet<Node> visited = new HashSet<Node>();
+        queue.Enqueue((currentNode, 0));
+        visited.Add(currentNode);
+
+        while (queue.Count > 0)
+        {
+            var (node, steps) = queue.Dequeue();
+            Debug.Log($"Checking node {node.nodeName} at {steps} steps");
+            foreach (Node connection in node.connections)
+            {
+                Debug.Log($"Found connection to {connection.nodeName}, steps + 1 = {steps + 1}, movement = {movement}");
+                if (!visited.Contains(connection) && steps + 1 <= movement)
+                {
+                    Debug.Log($"Highlighting node {connection.nodeName}");
+                    connection.Highlight(true);
+                    queue.Enqueue((connection, steps + 1));
+                    visited.Add(connection);
+                }
+            }
+        }
+    }
+
+
+    private void ResetHighlights()
+    {
+        foreach (Node node in FindObjectsByType<Node>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            node.Highlight(false);
+        }
+    }
+
+    public void MoveToNode(Node targetNode, bool throughUnits = false)
+    {
+        if (currentNode == null)
+        {
+            Debug.LogError("Current node is not set for: " + gameObject.tag);
+            return;
+        }
+
+        if (targetNode == null)
+        {
+            Debug.LogError("Target node is not set for: " + gameObject.tag);
+            return;
+        }
+
+        if (targetNode.IsOccupied())
+        {
+            Debug.LogError("Target node is occupied: " + targetNode.nodeName);
+            return;
+        }
+
+        if (!throughUnits && currentNode.PathBlockedByUnit(targetNode))
+        {
+            Debug.LogError("Cannot move through enemy units without special movement.");
+            return;
+        }
+
+        Debug.Log(gameObject.tag + " attempting to move to node: " + targetNode.nodeName);
+        int steps = CalculateStepsToNode(targetNode);
+        if (steps <= movement)
+        {
+            currentNode = targetNode;
+            transform.position = targetNode.transform.position;
+            movement -= steps;
+            Debug.Log(gameObject.tag + " moved to node: " + targetNode.nodeName + ". Remaining movement: " + movement);
+            HighlightNodesInRange();
+        }
+        else
+        {
+            Debug.Log(gameObject.tag + " does not have enough movement left.");
+        }
+    }
+
+
+
+    private int CalculateStepsToNode(Node targetNode)
+    {
+        Queue<(Node, int)> queue = new Queue<(Node, int)>();
+        HashSet<Node> visited = new HashSet<Node>();
+        queue.Enqueue((currentNode, 0));
+        visited.Add(currentNode);
+
+        while (queue.Count > 0)
+        {
+            var (node, steps) = queue.Dequeue();
+            if (node == targetNode)
+            {
+                return steps;
+            }
+
+            foreach (Node connection in node.connections)
+            {
+                if (!visited.Contains(connection))
+                {
+                    queue.Enqueue((connection, steps + 1));
+                    visited.Add(connection);
+                }
+            }
+        }
+
+        return int.MaxValue;
     }
 }

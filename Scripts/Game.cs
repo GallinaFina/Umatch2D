@@ -4,6 +4,9 @@ using System.Linq;
 
 public class Game : MonoBehaviour
 {
+    [SerializeField] private GameObject playerTokenPrefab;
+    [SerializeField] private GameObject enemyTokenPrefab;
+
     private Player player;
     private Enemy enemy;
     private DeckManager deckManager;
@@ -24,14 +27,10 @@ public class Game : MonoBehaviour
             Debug.LogError("CombatManager not found in the scene. Please ensure it is added");
         }
 
-        player = GameObject.FindWithTag("Player").GetComponent<Player>();
-        InitializePlayer(player, "NodeN", Player.CombatType.Melee);
-
+        InitializePlayer("NodeN", Player.CombatType.Melee);
         DrawInitialHand(player, 5);
 
-        enemy = GameObject.FindWithTag("Enemy").GetComponent<Enemy>();
-        InitializeEnemy(enemy, "NodeE_1");
-
+        InitializeEnemy("NodeE_1");
         DrawInitialHand(enemy, 5);
 
         if (combatManager != null)
@@ -69,12 +68,18 @@ public class Game : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.E))
         {
-            if (player != null)
+            var enemy = FindFirstObjectByType<Enemy>();
+            if (player != null && player.movement > 0)
             {
                 player.EndManeuver();
             }
+            else if (enemy != null && enemy.movement > 0)
+            {
+                enemy.EndManeuver();
+            }
         }
     }
+
 
     public void OnCardDiscarded(Card card)
     {
@@ -82,30 +87,32 @@ public class Game : MonoBehaviour
         handDisplay.DisplayHand(player.hand, OnCardDiscarded);
     }
 
-    private void InitializePlayer(Player player, string startNodeName, Player.CombatType type)
+    private void InitializePlayer(string startNodeName, Player.CombatType type)
     {
         Deck chosenDeck = deckManager.GetDeck("Bigfoot");
+
+        GameObject playerToken = Instantiate(playerTokenPrefab, Vector3.zero, Quaternion.identity);
+        player = playerToken.GetComponent<Player>();
+
         player.Initialize(chosenDeck, type);
         player.currentNode = board.GetNodeByName(startNodeName);
         player.SetStartingNode();
 
-        if (player.currentNode == null)
-        {
-            Debug.LogError("Starting node not found for: " + player.tag);
-        }
+        playerToken.transform.position = player.currentNode.transform.position;
     }
 
-    private void InitializeEnemy(Enemy enemy, string startNodeName)
+    private void InitializeEnemy(string startNodeName)
     {
         Deck chosenDeck = deckManager.GetDeck("Bigfoot");
+
+        GameObject enemyToken = Instantiate(enemyTokenPrefab, Vector3.zero, Quaternion.identity);
+        enemy = enemyToken.GetComponent<Enemy>();
+
         enemy.Initialize(chosenDeck);
         enemy.currentNode = board.GetNodeByName(startNodeName);
         enemy.SetStartingNode();
 
-        if (enemy.currentNode == null)
-        {
-            Debug.LogError("Starting node not found for: " + enemy.tag);
-        }
+        enemyToken.transform.position = enemy.currentNode.transform.position;
     }
 
     private void DrawInitialHand(Player player, int handSize)

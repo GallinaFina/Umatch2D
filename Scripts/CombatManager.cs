@@ -79,13 +79,6 @@ public class CombatManager : MonoBehaviour
         StartCoroutine(ResolveCombatSequence(defenseCard));
     }
 
-    private readonly List<(CardEffectTiming timing, string phase)> combatSequence = new List<(CardEffectTiming, string)>
-{
-    (CardEffectTiming.Immediately, "ImmediateEffects"),
-    (CardEffectTiming.DuringCombat, "DuringCombatEffects"),
-    (CardEffectTiming.AfterCombat, "AfterCombatEffects")
-};
-
     private IEnumerator ResolveCombatSequence(Card defenseCard)
     {
         Debug.Log("Beginning combat resolution");
@@ -125,11 +118,17 @@ public class CombatManager : MonoBehaviour
         // After combat effects
         combatUI.UpdatePhase(CombatUI.CombatPhase.AfterCombatEffects);
         ResolveEffects(CardEffectTiming.AfterCombat);
-        yield return new WaitForSeconds(2f);
 
+        // Wait for both selection and movement to complete
+        var movementUI = FindFirstObjectByType<MovementUI>();
+        while (movementUI != null && (!movementUI.IsMovementComplete || movementUI.IsSelectingUnit))
+        {
+            yield return null;
+        }
+
+        yield return new WaitForSeconds(0.5f);
         EndCombat(attackerWins);
     }
-
 
     private void ResolveEffects(CardEffectTiming timing)
     {
@@ -149,7 +148,6 @@ public class CombatManager : MonoBehaviour
             attackCard.TriggerEffect(player, enemy);  // Use player as source for attacker
         }
     }
-
 
     public bool DetermineWinner(Card attackCard, Card defenseCard)
     {

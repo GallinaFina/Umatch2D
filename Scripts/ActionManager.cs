@@ -25,7 +25,8 @@ public class ActionManager : MonoBehaviour
                 return currentAction == ActionState.None;
 
             case ActionState.Maneuvering:
-                return currentAction == ActionState.None;
+                // Allow forced movement even outside of normal action restrictions
+                return currentAction == ActionState.None || GetComponent<Enemy>() != null;
 
             case ActionState.BoostedManeuvering:
                 return currentAction == ActionState.Maneuvering;
@@ -34,6 +35,7 @@ public class ActionManager : MonoBehaviour
                 return false;
         }
     }
+
 
     public void StartAction(ActionState action)
     {

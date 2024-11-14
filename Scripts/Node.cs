@@ -24,14 +24,16 @@ public class Node : MonoBehaviour
     {
         if (isHighlighted)
         {
-            GameObject player = GameObject.FindWithTag("Player");
-            if (player != null)
+            var player = FindFirstObjectByType<Player>();
+            var enemy = FindFirstObjectByType<Enemy>();
+
+            if (player != null && player.movement > 0)
             {
-                player.GetComponent<Player>().MoveToNode(this);
+                player.MoveToNode(this, true);
             }
-            else
+            else if (enemy != null && enemy.movement > 0)
             {
-                Debug.LogError("Player GameObject not found.");
+                enemy.MoveToNode(this, true);
             }
         }
     }

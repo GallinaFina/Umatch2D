@@ -10,6 +10,7 @@ public class Player : MonoBehaviour
     public int movement;
     public Node currentNode;
     public Node startingNode;
+    public SpriteRenderer characterPortrait;
     public ActionManager actionManager;
 
     public int maxHP;
@@ -32,6 +33,13 @@ public class Player : MonoBehaviour
         combatType = type;
         maxHP = deck.startingHealth;
         currentHP = maxHP;
+
+        string portraitPath = "Images/Portraits/" + chosenDeck.name;
+        Sprite portrait = Resources.Load<Sprite>(portraitPath);
+        if (portrait != null)
+        {
+            characterPortrait.sprite = portrait;
+        }
     }
 
     public void SetStartingNode()
@@ -126,6 +134,7 @@ public class Player : MonoBehaviour
         {
             actionManager.StartAction(ActionState.Scheming);
             Debug.Log("Using scheme card: " + card.name);
+            card.TriggerEffect(this, null);  // Add this line to trigger the effect
             DiscardCard(card);
             var turnManager = FindFirstObjectByType<TurnManager>();
             if (turnManager != null)
@@ -136,16 +145,21 @@ public class Player : MonoBehaviour
         }
     }
 
+
     public void SelectCard(Card card)
     {
         var turnManager = FindFirstObjectByType<TurnManager>();
 
-        if (actionManager.currentAction == ActionState.Maneuvering && CanBoost)
+        // If we're maneuvering and can boost, use the card as a boost regardless of type
+        if ((actionManager.currentAction == ActionState.Maneuvering ||
+             actionManager.currentAction == ActionState.BoostedManeuvering) &&
+            CanBoost)
         {
             BoostManeuver(card);
             return;
         }
 
+        // Otherwise, handle the card based on its type
         switch (card.cardType)
         {
             case CardType.Attack:

@@ -9,7 +9,7 @@ public static class BigfootCardEffects
         EffectManager.Instance.DrawCards(source, cardsToDraw);
     }
 
-    public static void ItsJustYourImagination(Card card, MonoBehaviour source, bool wonCombat)
+    public static void Itsjustyourimagination(Card card, MonoBehaviour source, bool wonCombat)
     {
         Debug.Log($"Executing It's just your imagination effect");
         var combatManager = Object.FindFirstObjectByType<CombatManager>();
@@ -31,21 +31,32 @@ public static class BigfootCardEffects
 
     public static void Skirmish(Card card, MonoBehaviour source, bool wonCombat)
     {
-        Debug.Log($"Executing Skirmish effect");
-        if (source is Player player && player.currentNode != player.GetStartingNode())
+        Debug.Log($"Executing Skirmish effect. Combat won: {wonCombat}");
+        if (wonCombat)
         {
-            EffectManager.Instance.ModifyCardPower(card, card.power + 2);
+            var combatManager = Object.FindFirstObjectByType<CombatManager>();
+            var movementUI = Object.FindFirstObjectByType<MovementUI>();
+
+            if (combatManager != null && movementUI != null)
+            {
+                MonoBehaviour[] selectableUnits = { combatManager.player, combatManager.enemy };
+                movementUI.StartUnitSelection(selectableUnits, (selected) =>
+                    EffectManager.Instance.MovePlayer(selected, 2, true));
+            }
         }
     }
 
-    public static void CrashThroughTrees(Card card, MonoBehaviour source, bool wonCombat)
+
+
+    public static void Crashthroughthetrees(Card card, MonoBehaviour source, bool wonCombat)
     {
         Debug.Log($"Executing Crash Through Trees effect");
         if (source is Player player)
         {
-            EffectManager.Instance.MovePlayer(player, 2, true);
+            EffectManager.Instance.MovePlayer(player, 5, true);
         }
     }
+
 
     public static void Momentousshift(Card card, MonoBehaviour source, bool wonCombat)
     {
@@ -90,7 +101,4 @@ public static class BigfootCardEffects
             }
         }
     }
-
-
-
 }
