@@ -1,11 +1,14 @@
 using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 
 public class CombatManager : MonoBehaviour
 {
     public Player player;
     public Enemy enemy;
+    private MonoBehaviour attacker;
+    private MonoBehaviour defender;
     public Card attackCard;
     public Card defendCard;
     private bool isWaitingForDefender = false;
@@ -16,7 +19,7 @@ public class CombatManager : MonoBehaviour
         combatUI = FindFirstObjectByType<CombatUI>();
     }
 
-    public void InitiateAttack(Card selectedCard)
+    public void InitiateAttack(MonoBehaviour attackingUnit, Card selectedCard)
     {
         if (selectedCard.cardType != CardType.Attack && selectedCard.cardType != CardType.Versatile)
         {
@@ -24,24 +27,27 @@ public class CombatManager : MonoBehaviour
             return;
         }
 
+        attacker = attackingUnit;
         attackCard = selectedCard;
         attackCard.isFaceDown = true;
         isWaitingForDefender = true;
-        Debug.Log($"Attack initiated with {attackCard.name}");
+        Debug.Log($"Attack initiated by {attacker.name} with {attackCard.name}");
 
         combatUI.ShowCombatUI(true);
         combatUI.UpdatePhase(CombatUI.CombatPhase.AttackerSelection);
         combatUI.DisplayAttackerCard(attackCard);
 
-        RequestEnemyDefense();
+        RequestDefense();
     }
 
-    private void RequestEnemyDefense()
+    private void RequestDefense()
     {
-        var defendCard = enemy.SelectDefenseCard();
-        if (defendCard != null)
+        List<MonoBehaviour> validDefenders = GetValidDefenders(attacker);
+
+        if (validDefenders.Count > 0)
         {
-            DefendWith(defendCard);
+            var movementUI = FindFirstObjectByType<MovementUI>();
+            movementUI.StartUnitSelection(validDefenders, DefendWith);
         }
         else
         {
@@ -49,30 +55,94 @@ public class CombatManager : MonoBehaviour
         }
     }
 
-    public void DefendWith(Card selectedCard)
+    private List<MonoBehaviour> GetValidDefenders(MonoBehaviour attacker)
+    {
+        List<MonoBehaviour> defenders = new List<MonoBehaviour>();
+        Node attackerNode = null;
+        bool isMeleeAttacker = false;
+
+        if (attacker is Player player)
+        {
+            attackerNode = player.currentNode;
+            isMeleeAttacker = player.combatType == Player.CombatType.Melee;
+        }
+        else if (attacker is Sidekick sidekick)
+        {
+            attackerNode = sidekick.currentNode;
+            isMeleeAttacker = sidekick.combatType == Player.CombatType.Melee;
+        }
+        else if (attacker is Enemy enemy)
+        {
+            attackerNode = enemy.currentNode;
+            isMeleeAttacker = enemy.combatType == Player.CombatType.Melee;
+        }
+
+        var potentialDefenders = GetPotentialDefenders(attacker);
+
+        foreach (var defender in potentialDefenders)
+        {
+            Node defenderNode = null;
+            if (defender is Player p) defenderNode = p.currentNode;
+            else if (defender is Enemy e) defenderNode = e.currentNode;
+            else if (defender is Sidekick s) defenderNode = s.currentNode;
+
+            if (!isMeleeAttacker || attackerNode.IsConnectedTo(defenderNode))
+            {
+                defenders.Add(defender);
+            }
+        }
+
+        return defenders;
+    }
+
+    private List<MonoBehaviour> GetPotentialDefenders(MonoBehaviour attacker)
+    {
+        List<MonoBehaviour> defenders = new List<MonoBehaviour>();
+
+        if (attacker is Player || attacker is Sidekick sidekickA && sidekickA.owner is Player)
+        {
+            defenders.Add(FindFirstObjectByType<Enemy>());
+            defenders.AddRange(FindObjectsByType<Sidekick>(FindObjectsSortMode.None)
+                .Where(s => s.owner is Enemy));
+        }
+        else
+        {
+            defenders.Add(FindFirstObjectByType<Player>());
+            defenders.AddRange(FindObjectsByType<Sidekick>(FindObjectsSortMode.None)
+                .Where(s => s.owner is Player));
+        }
+
+        return defenders;
+    }
+
+
+    public void DefendWith(MonoBehaviour defendingUnit)
     {
         if (!isWaitingForDefender) return;
 
-        if (selectedCard != null &&
-            selectedCard.cardType != CardType.Defense &&
-            selectedCard.cardType != CardType.Versatile)
-        {
-            Debug.LogError("Cannot defend with non-defense card type");
-            return;
-        }
+        defender = defendingUnit;
+        Card selectedDefenseCard = null;
 
-        defendCard = selectedCard;
-        if (defendCard != null)
+        if (defender is Player player)
+            selectedDefenseCard = player.SelectCardForDefense();
+        else if (defender is Enemy enemy)
+            selectedDefenseCard = enemy.SelectDefenseCard();
+        else if (defender is Sidekick sidekick)
+            selectedDefenseCard = sidekick.SelectCardForDefense();
+
+        if (selectedDefenseCard != null)
         {
+            defendCard = selectedDefenseCard;
             defendCard.isFaceDown = true;
-            Debug.Log($"Defense declared with {defendCard.name}");
+            Debug.Log($"Defense declared by {defender.name} with {defendCard.name}");
 
             combatUI.UpdatePhase(CombatUI.CombatPhase.DefenderSelection);
             combatUI.DisplayDefenderCard(defendCard);
         }
 
-        ResolveCombat(defendCard);
+        ResolveCombat(selectedDefenseCard);
     }
+
 
     private void ResolveCombat(Card defenseCard)
     {
@@ -111,8 +181,8 @@ public class CombatManager : MonoBehaviour
         if (attackerWins)
         {
             int damageDifference = attackCard.power - (defenseCard?.power ?? 0);
-            enemy.TakeDamage(damageDifference);
-            Debug.Log($"Enemy takes {damageDifference} damage from power difference");
+            ApplyDamage(defender, damageDifference);
+            Debug.Log($"Defender takes {damageDifference} damage from power difference");
         }
 
         // After combat effects
@@ -132,20 +202,14 @@ public class CombatManager : MonoBehaviour
 
     private void ResolveEffects(CardEffectTiming timing)
     {
-        Debug.Log($"ResolveEffects called with timing: {timing}");
-        Debug.Log($"Attacker card: {attackCard.name}, Effect timing: {attackCard.effectTiming}");
-        Debug.Log($"Defender card: {defendCard?.name}, Effect timing: {defendCard?.effectTiming}");
-
         if (defendCard?.effectTiming == timing)
         {
-            Debug.Log($"Triggering defender's {timing} effect");
-            defendCard.TriggerEffect(enemy, player);  // Use enemy as source for defender
+            defendCard.TriggerEffect(defender, attacker);
         }
 
         if (attackCard.effectTiming == timing)
         {
-            Debug.Log($"Triggering attacker's {timing} effect");
-            attackCard.TriggerEffect(player, enemy);  // Use player as source for attacker
+            attackCard.TriggerEffect(attacker, defender);
         }
     }
 
@@ -155,6 +219,16 @@ public class CombatManager : MonoBehaviour
         return attackCard.power > defenseCard.power;
     }
 
+    private void ApplyDamage(MonoBehaviour target, int damage)
+    {
+        if (target is Player player)
+            player.TakeDamage(damage);
+        else if (target is Enemy enemy)
+            enemy.TakeDamage(damage);
+        else if (target is Sidekick sidekick)
+            sidekick.TakeDamage(damage);
+    }
+
     private void EndCombat(bool attackerWins)
     {
         Debug.Log($"Combat ended. Attacker {(attackerWins ? "wins!" : "loses!")}");
@@ -162,11 +236,18 @@ public class CombatManager : MonoBehaviour
         attackCard = null;
         defendCard = null;
         isWaitingForDefender = false;
+        attacker = null;
+        defender = null;
 
         combatUI.ShowCombatUI(false);
 
-        // End the attacking action state
-        player.actionManager.EndAction();
+        // End the attacking action state for the appropriate unit
+        if (attacker is Player player)
+            player.actionManager.EndAction();
+        else if (attacker is Enemy enemy)
+            enemy.actionManager.EndAction();
+        else if (attacker is Sidekick sidekick)
+            sidekick.actionManager.EndAction();
 
         var turnManager = FindFirstObjectByType<TurnManager>();
         if (turnManager != null)

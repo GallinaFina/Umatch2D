@@ -12,6 +12,7 @@ public class Enemy : MonoBehaviour
     public int maxHP;
     public int currentHP;
     public int movement;
+    public Player.CombatType combatType = Player.CombatType.Melee;
     public SpriteRenderer characterPortrait;
 
     void Start()
@@ -28,14 +29,13 @@ public class Enemy : MonoBehaviour
         Debug.Log($"Enemy Initialize - Current Node before SetStartingNode: {currentNode?.nodeName}");
         SetStartingNode();
         Debug.Log($"Enemy Initialize - Current Node after SetStartingNode: {currentNode?.nodeName}");
-    
-    string portraitPath = "Images/Portraits/" + chosenDeck.name;
+
+        string portraitPath = "Images/Portraits/" + chosenDeck.name;
         Sprite portrait = Resources.Load<Sprite>(portraitPath);
         if (portrait != null && characterPortrait != null)
         {
             characterPortrait.sprite = portrait;
         }
-    
     }
 
     public void SetStartingNode()
@@ -73,6 +73,26 @@ public class Enemy : MonoBehaviour
         }
     }
 
+    public void Maneuver()
+    {
+        if (actionManager.CanPerformAction(ActionState.Maneuvering))
+        {
+            actionManager.StartAction(ActionState.Maneuvering);
+            DrawCard();
+            movement = deck.baseMovement;
+
+            // Set same base movement for owned sidekick
+            var sidekick = FindFirstObjectByType<Sidekick>();
+            if (sidekick && sidekick.owner == this)
+            {
+                sidekick.movement = deck.baseMovement;
+                sidekick.HighlightNodesInRange();
+            }
+
+            HighlightNodesInRange();
+        }
+    }
+
     public void EndManeuver()
     {
         if (actionManager.currentAction == ActionState.Maneuvering ||
@@ -80,10 +100,18 @@ public class Enemy : MonoBehaviour
         {
             actionManager.EndAction();
             movement = 0;
+
+            // Reset sidekick movement too
+            var sidekick = FindFirstObjectByType<Sidekick>();
+            if (sidekick && sidekick.owner == this)
+            {
+                sidekick.movement = 0;
+                sidekick.ResetHighlights();
+            }
+
             ResetHighlights();
         }
     }
-
 
     public void DiscardCard(Card card)
     {
@@ -153,7 +181,6 @@ public class Enemy : MonoBehaviour
         }
     }
 
-
     private void ResetHighlights()
     {
         foreach (Node node in FindObjectsByType<Node>(FindObjectsInactive.Include, FindObjectsSortMode.None))
@@ -182,7 +209,7 @@ public class Enemy : MonoBehaviour
             return;
         }
 
-        if (!throughUnits && currentNode.PathBlockedByUnit(targetNode))
+        if (!throughUnits && currentNode.PathBlockedByUnit(targetNode, this))
         {
             Debug.LogError("Cannot move through enemy units without special movement.");
             return;
@@ -203,8 +230,6 @@ public class Enemy : MonoBehaviour
             Debug.Log(gameObject.tag + " does not have enough movement left.");
         }
     }
-
-
 
     private int CalculateStepsToNode(Node targetNode)
     {

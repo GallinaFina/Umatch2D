@@ -4,6 +4,8 @@ public class ActionManager : MonoBehaviour
 {
     public ActionState currentAction { get; set; } = ActionState.None;
     private TurnManager turnManager;
+    private MonoBehaviour currentUnit;
+    private bool hasMovedThisTurn = false;
 
     private void Start()
     {
@@ -25,8 +27,7 @@ public class ActionManager : MonoBehaviour
                 return currentAction == ActionState.None;
 
             case ActionState.Maneuvering:
-                // Allow forced movement even outside of normal action restrictions
-                return currentAction == ActionState.None || GetComponent<Enemy>() != null;
+                return currentAction == ActionState.None && !hasMovedThisTurn;
 
             case ActionState.BoostedManeuvering:
                 return currentAction == ActionState.Maneuvering;
@@ -36,14 +37,58 @@ public class ActionManager : MonoBehaviour
         }
     }
 
-
-    public void StartAction(ActionState action)
+    public void StartAction(ActionState action, MonoBehaviour unit = null)
     {
+        currentUnit = unit ?? GetComponent<MonoBehaviour>();
         currentAction = action;
+        turnManager.TrackActionState(currentUnit, action);
+
+        if (action == ActionState.Maneuvering)
+        {
+            hasMovedThisTurn = true;
+            var movementUI = FindFirstObjectByType<MovementUI>();
+            if (movementUI != null)
+            {
+                movementUI.ResetMovedUnits();
+            }
+        }
     }
 
     public void EndAction()
     {
-        currentAction = ActionState.None;
+        if (currentAction != ActionState.None)
+        {
+            var movementUI = FindFirstObjectByType<MovementUI>();
+            if (movementUI != null)
+            {
+                movementUI.ResetMovedUnits();
+            }
+
+            turnManager.PerformAction(ConvertToTurnAction(currentAction));
+            turnManager.TrackActionState(currentUnit, ActionState.None);
+            currentAction = ActionState.None;
+            currentUnit = null;
+        }
+    }
+
+    public void ResetTurn()
+    {
+        hasMovedThisTurn = false;
+    }
+
+    private TurnManager.ActionType ConvertToTurnAction(ActionState state)
+    {
+        switch (state)
+        {
+            case ActionState.Maneuvering:
+            case ActionState.BoostedManeuvering:
+                return TurnManager.ActionType.Maneuver;
+            case ActionState.Attacking:
+                return TurnManager.ActionType.Attack;
+            case ActionState.Scheming:
+                return TurnManager.ActionType.Scheme;
+            default:
+                return TurnManager.ActionType.Maneuver;
+        }
     }
 }

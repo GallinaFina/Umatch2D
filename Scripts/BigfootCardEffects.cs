@@ -1,4 +1,5 @@
 using UnityEngine;
+using System.Linq;
 
 public static class BigfootCardEffects
 {
@@ -40,8 +41,9 @@ public static class BigfootCardEffects
             if (combatManager != null && movementUI != null)
             {
                 MonoBehaviour[] selectableUnits = { combatManager.player, combatManager.enemy };
-                movementUI.StartUnitSelection(selectableUnits, (selected) =>
+                movementUI.StartUnitSelection(selectableUnits.ToList(), (selected) =>
                     EffectManager.Instance.MovePlayer(selected, 2, true));
+
             }
         }
     }

@@ -2,10 +2,19 @@ using System.Collections.Generic;
 using UnityEngine;
 
 [System.Serializable]
+public class SidekickData
+{
+    public string name;
+    public Player.CombatType combatType;
+    public int health;
+}
+
+[System.Serializable]
 public class Deck
 {
     public string name;
     public List<Card> cards;
+    public List<SidekickData> sidekicks = new List<SidekickData>();
     private const int maxCards = 30;
     public int baseMovement;
     public int startingHealth;

@@ -12,6 +12,7 @@ public class Player : MonoBehaviour
     public Node startingNode;
     public SpriteRenderer characterPortrait;
     public ActionManager actionManager;
+    public List<Sidekick> sidekicks = new List<Sidekick>();
 
     public int maxHP;
     public int currentHP;
@@ -88,15 +89,39 @@ public class Player : MonoBehaviour
             DrawCard();
             movement = deck.baseMovement;
             canBoost = true;
-            Debug.Log("Base movement for " + gameObject.tag + ": " + movement);
+
+            // Set same base movement for owned sidekicks
+            foreach (var sidekick in sidekicks)
+            {
+                sidekick.movement = deck.baseMovement;
+            }
+
+            // Start unit selection using existing MovementUI
+            var movementUI = FindFirstObjectByType<MovementUI>();
+            if (movementUI != null)
+            {
+                List<MonoBehaviour> selectableUnits = new List<MonoBehaviour> { this };
+                selectableUnits.AddRange(sidekicks);
+                movementUI.StartUnitSelection(selectableUnits, OnUnitSelected);
+            }
 
             var handDisplay = FindFirstObjectByType<HandDisplay>();
-            if (handDisplay != null && CompareTag("Player"))
+            if (handDisplay != null)
             {
                 handDisplay.DisplayHand(hand, SelectCard);
             }
+        }
+    }
 
-            HighlightNodesInRange();
+    private void OnUnitSelected(MonoBehaviour selectedUnit)
+    {
+        if (selectedUnit is Player player)
+        {
+            player.HighlightNodesInRange();
+        }
+        else if (selectedUnit is Sidekick sidekick)
+        {
+            sidekick.HighlightNodesInRange();
         }
     }
 
@@ -121,10 +146,23 @@ public class Player : MonoBehaviour
         {
             actionManager.StartAction(ActionState.BoostedManeuvering);
             DiscardCard(cardToDiscard);
-            movement += cardToDiscard.boost;
+            int boostAmount = cardToDiscard.boost;
+
+            movement += boostAmount;
+
+            foreach (var sidekick in sidekicks)
+            {
+                sidekick.movement += boostAmount;
+            }
+
             canBoost = false;
-            Debug.Log("Boosted movement by: " + cardToDiscard.boost + " for " + gameObject.tag);
-            HighlightNodesInRange();
+            Debug.Log($"Boosted movement by: {boostAmount} for all units");
+
+            var movementUI = FindFirstObjectByType<MovementUI>();
+            if (movementUI != null && movementUI.CurrentlySelectedUnit != null)
+            {
+                OnUnitSelected(movementUI.CurrentlySelectedUnit);
+            }
         }
     }
 
@@ -134,7 +172,7 @@ public class Player : MonoBehaviour
         {
             actionManager.StartAction(ActionState.Scheming);
             Debug.Log("Using scheme card: " + card.name);
-            card.TriggerEffect(this, null);  // Add this line to trigger the effect
+            card.TriggerEffect(this, null);
             DiscardCard(card);
             var turnManager = FindFirstObjectByType<TurnManager>();
             if (turnManager != null)
@@ -145,12 +183,16 @@ public class Player : MonoBehaviour
         }
     }
 
-
     public void SelectCard(Card card)
     {
+        if (!card.CanBeUsedBy(this))
+        {
+            Debug.Log($"Card {card.name} cannot be used by {gameObject.name}");
+            return;
+        }
+
         var turnManager = FindFirstObjectByType<TurnManager>();
 
-        // If we're maneuvering and can boost, use the card as a boost regardless of type
         if ((actionManager.currentAction == ActionState.Maneuvering ||
              actionManager.currentAction == ActionState.BoostedManeuvering) &&
             CanBoost)
@@ -159,7 +201,6 @@ public class Player : MonoBehaviour
             return;
         }
 
-        // Otherwise, handle the card based on its type
         switch (card.cardType)
         {
             case CardType.Attack:
@@ -175,7 +216,6 @@ public class Player : MonoBehaviour
         }
     }
 
-
     private void SelectCardForAttack(Card card)
     {
         if (combatType == CombatType.Melee && !currentNode.IsConnectedTo(FindFirstObjectByType<Enemy>().currentNode))
@@ -187,20 +227,28 @@ public class Player : MonoBehaviour
         var combatManager = FindFirstObjectByType<CombatManager>();
         if (combatManager != null)
         {
-            if (card.cardType == CardType.Attack || card.cardType == CardType.Versatile)
-            {
-                actionManager.StartAction(ActionState.Attacking);
-                DiscardCard(card);
-                combatManager.InitiateAttack(card);
-            }
-            else
-            {
-                Debug.LogError("Cannot attack with this card type");
-            }
+            actionManager.StartAction(ActionState.Attacking);
+            DiscardCard(card);
+            combatManager.InitiateAttack(this, card);
         }
     }
 
-    public void DefendAgainstAttack(Card card)
+    public Card SelectCardForDefense()
+    {
+        var validDefenseCards = hand.Where(card =>
+            (card.cardType == CardType.Defense || card.cardType == CardType.Versatile) &&
+            card.CanBeUsedBy(this)).ToList();
+
+        if (validDefenseCards.Count > 0)
+        {
+            Card selectedCard = validDefenseCards[0];
+            DefendAgainstAttack(selectedCard);
+            return selectedCard;
+        }
+        return null;
+    }
+
+    private void DefendAgainstAttack(Card card)
     {
         if (card.cardType == CardType.Defense || card.cardType == CardType.Versatile)
         {
@@ -208,12 +256,8 @@ public class Player : MonoBehaviour
             if (combatManager != null)
             {
                 DiscardCard(card);
-                combatManager.DefendWith(card);
+                combatManager.DefendWith(this);
             }
-        }
-        else
-        {
-            Debug.LogError("Cannot defend with this card type");
         }
     }
 
@@ -288,7 +332,6 @@ public class Player : MonoBehaviour
         }
     }
 
-
     private int CalculateStepsToNode(Node targetNode)
     {
         Queue<(Node, int)> queue = new Queue<(Node, int)>();
@@ -338,7 +381,21 @@ public class Player : MonoBehaviour
             actionManager.EndAction();
             canBoost = false;
             movement = 0;
+
+            // Reset sidekick movement too
+            foreach (var sidekick in sidekicks)
+            {
+                sidekick.movement = 0;
+                sidekick.ResetHighlights();
+            }
+
             ResetHighlights();
+
+            var movementUI = FindFirstObjectByType<MovementUI>();
+            if (movementUI != null)
+            {
+                movementUI.ResetMovedUnits();
+            }
         }
     }
 }

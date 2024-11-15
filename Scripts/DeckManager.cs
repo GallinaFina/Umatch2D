@@ -3,6 +3,24 @@ using UnityEngine;
 using System.IO;
 using System;
 
+[System.Serializable]
+public class SidekickDataJson
+{
+    public string name;
+    public int startingHealth;
+    public string combatType;
+}
+
+[System.Serializable]
+public class DeckJson
+{
+    public string name;
+    public int startingHealth;
+    public int baseMovement;
+    public List<Card> cards;
+    public List<SidekickDataJson> sidekicks;
+}
+
 public class DeckManager : MonoBehaviour
 {
     public List<Deck> allDecks = new List<Deck>();
@@ -21,11 +39,10 @@ public class DeckManager : MonoBehaviour
             try
             {
                 string json = File.ReadAllText(file);
-                Deck deck = JsonUtility.FromJson<Deck>(json);
+                DeckJson deckJson = JsonUtility.FromJson<DeckJson>(json);
+                Deck deck = new Deck(deckJson.name, new List<Card>(), deckJson.baseMovement, deckJson.startingHealth);
 
-                Debug.Log("Loaded deck: " + deck.name + " with baseMovement: " + deck.baseMovement);
-
-                List<Card> originalCards = new List<Card>(deck.cards);
+                List<Card> originalCards = new List<Card>(deckJson.cards);
                 List<Card> expandedCards = new List<Card>();
 
                 foreach (Card card in originalCards)
@@ -34,6 +51,7 @@ public class DeckManager : MonoBehaviour
                     {
                         CardType parsedType = (CardType)System.Enum.Parse(typeof(CardType), card.type);
                         CardEffectTiming timing = DetermineEffectTiming(card.ability);
+                        CardUser cardUser = DetermineCardUser(card.allowedUser);
 
                         expandedCards.Add(new Card(
                             card.name,
@@ -43,11 +61,28 @@ public class DeckManager : MonoBehaviour
                             card.ability,
                             1,
                             card.imagePath,
-                            timing
+                            timing,
+                            cardUser,
+                            card.allowedUser
                         ));
                     }
                 }
                 deck.cards = expandedCards;
+
+                // Process sidekicks
+                foreach (var sidekickJson in deckJson.sidekicks)
+                {
+                    Player.CombatType combatType = (Player.CombatType)System.Enum.Parse(typeof(Player.CombatType), sidekickJson.combatType);
+                    SidekickData sidekickData = new SidekickData
+                    {
+                        name = sidekickJson.name,
+                        health = sidekickJson.startingHealth,
+                        combatType = combatType
+                    };
+                    deck.sidekicks.Add(sidekickData);
+                    Debug.Log($"Loaded sidekick: {sidekickData.name} with health: {sidekickData.health}");
+                }
+
                 allDecks.Add(deck);
             }
             catch (Exception e)
@@ -70,6 +105,14 @@ public class DeckManager : MonoBehaviour
             return CardEffectTiming.AfterCombat;
 
         return CardEffectTiming.None;
+    }
+
+    private CardUser DetermineCardUser(string allowedUser)
+    {
+        if (string.IsNullOrEmpty(allowedUser)) return CardUser.Any;
+        if (allowedUser == "MainCharacter") return CardUser.MainCharacter;
+        if (allowedUser == "Sidekick") return CardUser.Sidekick;
+        return CardUser.SpecificSidekick;
     }
 
     public Deck GetDeck(string deckName)

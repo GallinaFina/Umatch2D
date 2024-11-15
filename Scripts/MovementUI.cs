@@ -7,19 +7,23 @@ using System.Collections.Generic;
 public class MovementUI : MonoBehaviour
 {
     private Action<MonoBehaviour> onUnitSelected;
-    private MonoBehaviour[] selectableUnits;
+    private List<MonoBehaviour> selectableUnits = new List<MonoBehaviour>();
+    private List<MonoBehaviour> movedUnits = new List<MonoBehaviour>();
     private bool isSelectingUnit = false;
     public bool IsSelectingUnit => isSelectingUnit;
     public bool IsMovementComplete { get; private set; } = true;
+    private MonoBehaviour currentlySelectedUnit;
+    public MonoBehaviour CurrentlySelectedUnit => currentlySelectedUnit;
     public Material defaultMaterial;
     public Material highlightMaterial;
+    public Material movedMaterial;
     private Dictionary<MonoBehaviour, Material> originalMaterials = new Dictionary<MonoBehaviour, Material>();
 
-    public void StartUnitSelection(MonoBehaviour[] units, Action<MonoBehaviour> callback)
+    public void StartUnitSelection(List<MonoBehaviour> units, Action<MonoBehaviour> callback)
     {
-        Debug.Log("Starting unit selection");
+        Debug.Log($"Starting unit selection with {units.Count} units");
         IsMovementComplete = false;
-        selectableUnits = units;
+        selectableUnits = units.Where(u => !movedUnits.Contains(u)).ToList();
         onUnitSelected = (selected) => {
             callback(selected);
             StartCoroutine(WaitForMovement(selected));
@@ -36,6 +40,15 @@ public class MovementUI : MonoBehaviour
                 renderer.material = highlightMaterial;
             }
         }
+
+        foreach (var unit in movedUnits)
+        {
+            var renderer = unit.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.material = movedMaterial;
+            }
+        }
     }
 
     void Update()
@@ -44,24 +57,16 @@ public class MovementUI : MonoBehaviour
 
         if (Input.GetMouseButtonDown(0))
         {
-            Debug.Log("Click detected while selecting unit");
             Vector2 mousePosition = Camera.main.ScreenToWorldPoint(Input.mousePosition);
-            Debug.Log($"Attempting raycast at position: {mousePosition}");
             RaycastHit2D hit = Physics2D.Raycast(mousePosition, Vector2.zero);
 
             if (hit.collider != null)
             {
-                Debug.Log($"Hit object: {hit.collider.gameObject.name} on layer: {hit.collider.gameObject.layer}");
                 MonoBehaviour clickedUnit = hit.collider.GetComponent<MonoBehaviour>();
                 if (selectableUnits.Contains(clickedUnit))
                 {
-                    Debug.Log($"Valid unit selected: {clickedUnit.gameObject.name}");
                     EndSelection(clickedUnit);
                 }
-            }
-            else
-            {
-                Debug.Log("No object hit by raycast");
             }
         }
     }
@@ -70,6 +75,7 @@ public class MovementUI : MonoBehaviour
     {
         Debug.Log($"Ending selection with unit: {selected.gameObject.name}");
         isSelectingUnit = false;
+        currentlySelectedUnit = selected;
 
         foreach (var unit in selectableUnits)
         {
@@ -82,6 +88,24 @@ public class MovementUI : MonoBehaviour
         originalMaterials.Clear();
 
         onUnitSelected?.Invoke(selected);
+    }
+
+    public void MarkUnitMoved(MonoBehaviour unit)
+    {
+        if (!movedUnits.Contains(unit))
+        {
+            movedUnits.Add(unit);
+            var renderer = unit.GetComponent<Renderer>();
+            if (renderer != null)
+            {
+                renderer.material = movedMaterial;
+            }
+        }
+    }
+
+    public void ResetMovedUnits()
+    {
+        movedUnits.Clear();
     }
 
     private IEnumerator WaitForMovement(MonoBehaviour unit)
@@ -101,6 +125,22 @@ public class MovementUI : MonoBehaviour
                 yield return null;
             }
         }
+        else if (unit is Sidekick sidekick)
+        {
+            while (sidekick.movement > 0)
+            {
+                yield return null;
+            }
+        }
+
+        MarkUnitMoved(unit);
         IsMovementComplete = true;
+
+        // Check if any units still have movement
+        var remainingUnits = selectableUnits.Where(u => !movedUnits.Contains(u)).ToList();
+        if (remainingUnits.Any())
+        {
+            StartUnitSelection(remainingUnits, onUnitSelected);
+        }
     }
 }

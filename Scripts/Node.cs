@@ -22,16 +22,29 @@ public class Node : MonoBehaviour
 
     private void OnMouseDown()
     {
-        if (isHighlighted)
-        {
-            var player = FindFirstObjectByType<Player>();
-            var enemy = FindFirstObjectByType<Enemy>();
+        if (!isHighlighted) return;
 
-            if (player != null && player.movement > 0)
+        var game = FindFirstObjectByType<Game>();
+        if (game != null && game.currentState == Game.GameState.SidekickPlacement)
+        {
+            game.PlaceSidekick(this);
+            return;
+        }
+
+        var movementUI = FindFirstObjectByType<MovementUI>();
+        if (movementUI != null && movementUI.CurrentlySelectedUnit != null)
+        {
+            var selectedUnit = movementUI.CurrentlySelectedUnit;
+
+            if (selectedUnit is Player player && player.movement > 0)
             {
                 player.MoveToNode(this, true);
             }
-            else if (enemy != null && enemy.movement > 0)
+            else if (selectedUnit is Sidekick sidekick && sidekick.movement > 0)
+            {
+                sidekick.MoveToNode(this, true);
+            }
+            else if (selectedUnit is Enemy enemy && enemy.movement > 0)
             {
                 enemy.MoveToNode(this, true);
             }
@@ -43,17 +56,43 @@ public class Node : MonoBehaviour
         isHighlighted = highlight;
         if (nodeRenderer != null)
         {
-            nodeRenderer.material.color = highlight ? Color.yellow : Color.white;
+            var game = FindFirstObjectByType<Game>();
+            if (game != null && game.currentState == Game.GameState.SidekickPlacement)
+            {
+                nodeRenderer.material.color = highlight ? Color.green : Color.white;
+                return;
+            }
+
+            var movementUI = FindFirstObjectByType<MovementUI>();
+            if (movementUI != null && movementUI.CurrentlySelectedUnit != null)
+            {
+                var selectedUnit = movementUI.CurrentlySelectedUnit;
+                bool canMove = false;
+
+                if (selectedUnit is Player player)
+                    canMove = !IsOccupied() && player.movement > 0;
+                else if (selectedUnit is Sidekick sidekick)
+                    canMove = !IsOccupied() && sidekick.movement > 0;
+                else if (selectedUnit is Enemy enemy)
+                    canMove = !IsOccupied() && enemy.movement > 0;
+
+                nodeRenderer.material.color = highlight && canMove ? Color.yellow : Color.white;
+            }
+            else
+            {
+                nodeRenderer.material.color = highlight ? Color.yellow : Color.white;
+            }
         }
     }
 
     public bool IsOccupied()
     {
         return FindObjectsByType<Player>(FindObjectsSortMode.None).Any(p => p.currentNode == this) ||
-               FindObjectsByType<Enemy>(FindObjectsSortMode.None).Any(e => e.currentNode == this);
+               FindObjectsByType<Enemy>(FindObjectsSortMode.None).Any(e => e.currentNode == this) ||
+               FindObjectsByType<Sidekick>(FindObjectsSortMode.None).Any(s => s.currentNode == this);
     }
 
-    public bool PathBlockedByUnit(Node targetNode)
+    public bool PathBlockedByUnit(Node targetNode, MonoBehaviour unit = null)
     {
         var path = GetPathToNode(targetNode);
         foreach (var node in path)
