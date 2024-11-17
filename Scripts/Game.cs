@@ -9,8 +9,8 @@ public class Game : MonoBehaviour
     [SerializeField] private GameObject sidekickTokenPrefab;
     [SerializeField] private SidekickPlacementUI placementUI;
 
-    private Player player;
-    private Enemy enemy;
+    public Player player;
+    public Enemy enemy;
     private DeckManager deckManager;
     private Board board;
     public HandDisplay handDisplay;
@@ -33,12 +33,6 @@ public class Game : MonoBehaviour
         deckManager = FindFirstObjectByType<DeckManager>();
         turnManager = FindFirstObjectByType<TurnManager>();
 
-        combatManager = FindFirstObjectByType<CombatManager>();
-        if (combatManager == null)
-        {
-            Debug.LogError("CombatManager not found in the scene. Please ensure it is added");
-        }
-
         InitializePlayer("NodeN", Player.CombatType.Melee);
         InitializeSidekicks();
         StartSidekickPlacement();
@@ -46,6 +40,10 @@ public class Game : MonoBehaviour
         InitializeEnemy("NodeE_1");
         InitializeEnemySidekicks();
         DrawInitialHand(enemy, 5);
+
+        // Set references in TurnManager
+        turnManager.player = player;
+        turnManager.enemy = enemy;
 
         if (combatManager != null)
         {
@@ -55,6 +53,7 @@ public class Game : MonoBehaviour
 
         DrawInitialHand(player, 5);
     }
+
 
     void Update()
     {
@@ -75,13 +74,14 @@ public class Game : MonoBehaviour
                 movementUI.ResetMovedUnits();
             }
 
-            if (player != null && player.movement > 0)
+            if (player != null)
             {
+                player.movement = 0;
+                foreach (var sidekick in player.sidekicks)
+                {
+                    sidekick.movement = 0;
+                }
                 player.EndManeuver();
-            }
-            else if (enemy != null && enemy.movement > 0)
-            {
-                enemy.EndManeuver();
             }
         }
     }

@@ -32,6 +32,7 @@ public class SidekickPlacementUI : MonoBehaviour
         if (!show)
         {
             confirmationPanel.SetActive(false);
+            ResetAllNodeColors();
         }
     }
 
@@ -46,12 +47,26 @@ public class SidekickPlacementUI : MonoBehaviour
         var renderer = node.GetComponent<SpriteRenderer>();
         if (renderer != null)
         {
-            renderer.color = isValid ? validPlacementColor : invalidPlacementColor;
+            renderer.color = isValid ? validPlacementColor : Color.white;
+        }
+    }
+
+    private void ResetAllNodeColors()
+    {
+        var nodes = FindObjectsByType<Node>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var node in nodes)
+        {
+            var renderer = node.GetComponent<SpriteRenderer>();
+            if (renderer != null)
+            {
+                renderer.color = Color.white;
+            }
         }
     }
 
     private void ConfirmPlacement()
     {
+        ResetAllNodeColors();
         var game = FindFirstObjectByType<Game>();
         game.FinishSidekickPlacement();
     }

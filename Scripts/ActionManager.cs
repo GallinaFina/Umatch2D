@@ -66,6 +66,13 @@ public class ActionManager : MonoBehaviour
 
             turnManager.PerformAction(ConvertToTurnAction(currentAction));
             turnManager.TrackActionState(currentUnit, ActionState.None);
+
+            if (currentAction == ActionState.Maneuvering ||
+                currentAction == ActionState.BoostedManeuvering)
+            {
+                ResetTurn();
+            }
+
             currentAction = ActionState.None;
             currentUnit = null;
         }
@@ -74,6 +81,8 @@ public class ActionManager : MonoBehaviour
     public void ResetTurn()
     {
         hasMovedThisTurn = false;
+        currentAction = ActionState.None;
+        currentUnit = null;
     }
 
     private TurnManager.ActionType ConvertToTurnAction(ActionState state)

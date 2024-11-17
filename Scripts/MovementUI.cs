@@ -24,10 +24,7 @@ public class MovementUI : MonoBehaviour
         Debug.Log($"Starting unit selection with {units.Count} units");
         IsMovementComplete = false;
         selectableUnits = units.Where(u => !movedUnits.Contains(u)).ToList();
-        onUnitSelected = (selected) => {
-            callback(selected);
-            StartCoroutine(WaitForMovement(selected));
-        };
+        onUnitSelected = callback;
         isSelectingUnit = true;
 
         foreach (var unit in selectableUnits)
@@ -63,7 +60,7 @@ public class MovementUI : MonoBehaviour
             if (hit.collider != null)
             {
                 MonoBehaviour clickedUnit = hit.collider.GetComponent<MonoBehaviour>();
-                if (selectableUnits.Contains(clickedUnit))
+                if (selectableUnits.Contains(clickedUnit) && !movedUnits.Contains(clickedUnit))
                 {
                     EndSelection(clickedUnit);
                 }
@@ -74,18 +71,20 @@ public class MovementUI : MonoBehaviour
     private void EndSelection(MonoBehaviour selected)
     {
         Debug.Log($"Ending selection with unit: {selected.gameObject.name}");
-        isSelectingUnit = false;
         currentlySelectedUnit = selected;
 
+        // Reset materials for unselected units
         foreach (var unit in selectableUnits)
         {
-            var renderer = unit.GetComponent<Renderer>();
-            if (renderer != null && originalMaterials.ContainsKey(unit))
+            if (unit != selected && !movedUnits.Contains(unit))
             {
-                renderer.material = originalMaterials[unit];
+                var renderer = unit.GetComponent<Renderer>();
+                if (renderer != null && originalMaterials.ContainsKey(unit))
+                {
+                    renderer.material = originalMaterials[unit];
+                }
             }
         }
-        originalMaterials.Clear();
 
         onUnitSelected?.Invoke(selected);
     }
@@ -100,12 +99,44 @@ public class MovementUI : MonoBehaviour
             {
                 renderer.material = movedMaterial;
             }
+
+            // Check if all units have moved
+            if (selectableUnits.All(u => movedUnits.Contains(u)))
+            {
+                IsMovementComplete = true;
+                isSelectingUnit = false;
+            }
+            else
+            {
+                // Allow selection of remaining unmoved units
+                var remainingUnits = selectableUnits.Where(u => !movedUnits.Contains(u)).ToList();
+                if (remainingUnits.Any())
+                {
+                    currentlySelectedUnit = null;
+                    isSelectingUnit = true;
+                }
+            }
         }
     }
 
     public void ResetMovedUnits()
     {
         movedUnits.Clear();
+        foreach (var material in originalMaterials)
+        {
+            if (material.Key != null)
+            {
+                var renderer = material.Key.GetComponent<Renderer>();
+                if (renderer != null)
+                {
+                    renderer.material = material.Value;
+                }
+            }
+        }
+        originalMaterials.Clear();
+        IsMovementComplete = true;
+        currentlySelectedUnit = null;
+        isSelectingUnit = false;
     }
 
     private IEnumerator WaitForMovement(MonoBehaviour unit)
@@ -134,13 +165,22 @@ public class MovementUI : MonoBehaviour
         }
 
         MarkUnitMoved(unit);
-        IsMovementComplete = true;
 
-        // Check if any units still have movement
-        var remainingUnits = selectableUnits.Where(u => !movedUnits.Contains(u)).ToList();
-        if (remainingUnits.Any())
+        // Check for any units with remaining movement
+        var unitsWithMovement = selectableUnits.Where(u =>
+            !movedUnits.Contains(u) &&
+            ((u is Player p && p.movement > 0) ||
+             (u is Sidekick s && s.movement > 0) ||
+             (u is Enemy e && e.movement > 0))).ToList();
+
+        if (unitsWithMovement.Any())
         {
-            StartUnitSelection(remainingUnits, onUnitSelected);
+            StartUnitSelection(unitsWithMovement, onUnitSelected);
+        }
+        else
+        {
+            IsMovementComplete = true;
+            isSelectingUnit = false;
         }
     }
 }

@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using System.Collections;
 
 public class TurnManager : MonoBehaviour
 {
@@ -44,18 +45,32 @@ public class TurnManager : MonoBehaviour
     {
         if (actionsRemaining > 0)
         {
+            if (!EffectManager.Instance.IsEffectComplete)
+            {
+                return;
+            }
+
             actionsRemaining--;
             Debug.Log($"Action performed: {actionType}. Actions remaining: {actionsRemaining}");
 
             if (actionsRemaining == 0)
             {
-                EndPlayerTurn();
+                StartCoroutine(WaitForEffectsThenEndTurn());
             }
         }
         else
         {
             Debug.Log("No actions remaining to perform.");
         }
+    }
+
+    private IEnumerator WaitForEffectsThenEndTurn()
+    {
+        while (!EffectManager.Instance.IsEffectComplete)
+        {
+            yield return null;
+        }
+        EndPlayerTurn();
     }
 
     public void TrackActionState(MonoBehaviour unit, ActionState state)

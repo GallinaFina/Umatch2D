@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System.Linq;
+using System.Collections;
 
 public class Player : MonoBehaviour
 {
@@ -59,6 +60,7 @@ public class Player : MonoBehaviour
         Debug.Log($"{gameObject.tag} took {amount} damage. HP: {currentHP}/{maxHP}");
     }
 
+
     public void DrawCard()
     {
         if (deck.cards.Count == 0)
@@ -90,13 +92,11 @@ public class Player : MonoBehaviour
             movement = deck.baseMovement;
             canBoost = true;
 
-            // Set same base movement for owned sidekicks
             foreach (var sidekick in sidekicks)
             {
                 sidekick.movement = deck.baseMovement;
             }
 
-            // Start unit selection using existing MovementUI
             var movementUI = FindFirstObjectByType<MovementUI>();
             if (movementUI != null)
             {
@@ -172,15 +172,26 @@ public class Player : MonoBehaviour
         {
             actionManager.StartAction(ActionState.Scheming);
             Debug.Log("Using scheme card: " + card.name);
+            EffectManager.Instance.StartEffect();
             card.TriggerEffect(this, null);
             DiscardCard(card);
-            var turnManager = FindFirstObjectByType<TurnManager>();
-            if (turnManager != null)
-            {
-                turnManager.PerformAction(TurnManager.ActionType.Scheme);
-            }
-            actionManager.EndAction();
+            StartCoroutine(WaitForEffectThenEndScheme());
         }
+    }
+
+    private IEnumerator WaitForEffectThenEndScheme()
+    {
+        while (!EffectManager.Instance.IsEffectComplete)
+        {
+            yield return null;
+        }
+
+        var turnManager = FindFirstObjectByType<TurnManager>();
+        if (turnManager != null)
+        {
+            turnManager.PerformAction(TurnManager.ActionType.Scheme);
+        }
+        actionManager.EndAction();
     }
 
     public void SelectCard(Card card)
@@ -305,7 +316,10 @@ public class Player : MonoBehaviour
             return;
         }
 
-        if (!throughUnits && currentNode.PathBlockedByUnit(targetNode))
+        bool isRegularMovement = actionManager.currentAction == ActionState.Maneuvering ||
+                                actionManager.currentAction == ActionState.BoostedManeuvering;
+
+        if (isRegularMovement && !throughUnits && currentNode.PathBlockedByUnit(targetNode, this))
         {
             Debug.LogError("Cannot move through enemy units without special movement.");
             return;
@@ -321,9 +335,13 @@ public class Player : MonoBehaviour
             Debug.Log(gameObject.tag + " moved to node: " + targetNode.nodeName + ". Remaining movement: " + movement);
             HighlightNodesInRange();
 
-            if (movement == 0 && actionManager.currentAction == ActionState.BoostedManeuvering)
+            if (movement <= 0)
             {
-                EndManeuver();
+                var movementUI = FindFirstObjectByType<MovementUI>();
+                if (movementUI != null)
+                {
+                    movementUI.MarkUnitMoved(this);
+                }
             }
         }
         else
@@ -373,16 +391,9 @@ public class Player : MonoBehaviour
         if (actionManager.currentAction == ActionState.Maneuvering ||
             actionManager.currentAction == ActionState.BoostedManeuvering)
         {
-            var turnManager = FindFirstObjectByType<TurnManager>();
-            if (turnManager != null)
-            {
-                turnManager.PerformAction(TurnManager.ActionType.Maneuver);
-            }
-            actionManager.EndAction();
             canBoost = false;
             movement = 0;
 
-            // Reset sidekick movement too
             foreach (var sidekick in sidekicks)
             {
                 sidekick.movement = 0;
@@ -396,6 +407,10 @@ public class Player : MonoBehaviour
             {
                 movementUI.ResetMovedUnits();
             }
+
+            // Let ActionManager handle the turn action and state changes
+            actionManager.EndAction();
         }
     }
 }
+

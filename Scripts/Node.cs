@@ -38,18 +38,46 @@ public class Node : MonoBehaviour
 
             if (selectedUnit is Player player && player.movement > 0)
             {
-                player.MoveToNode(this, true);
+                player.MoveToNode(this, false);
             }
             else if (selectedUnit is Sidekick sidekick && sidekick.movement > 0)
             {
-                sidekick.MoveToNode(this, true);
+                sidekick.MoveToNode(this, false);
             }
             else if (selectedUnit is Enemy enemy && enemy.movement > 0)
             {
-                enemy.MoveToNode(this, true);
+                enemy.MoveToNode(this, false);
             }
         }
     }
+
+    private void OnMouseEnter()
+    {
+        var game = FindFirstObjectByType<Game>();
+        if (game != null && game.currentState == Game.GameState.SidekickPlacement)
+        {
+            var placementUI = FindFirstObjectByType<SidekickPlacementUI>();
+            if (placementUI != null)
+            {
+                bool isValid = zones.Intersect(game.player.GetStartingNode().zones).Any() && !IsOccupied();
+                placementUI.HighlightHoveredNode(this, isValid);
+            }
+        }
+    }
+
+    private void OnMouseExit()
+    {
+        var game = FindFirstObjectByType<Game>();
+        if (game != null && game.currentState == Game.GameState.SidekickPlacement)
+        {
+            var placementUI = FindFirstObjectByType<SidekickPlacementUI>();
+            if (placementUI != null)
+            {
+                placementUI.HighlightHoveredNode(this, false);
+            }
+        }
+    }
+
 
     public void Highlight(bool highlight)
     {
@@ -59,7 +87,6 @@ public class Node : MonoBehaviour
             var game = FindFirstObjectByType<Game>();
             if (game != null && game.currentState == Game.GameState.SidekickPlacement)
             {
-                nodeRenderer.material.color = highlight ? Color.green : Color.white;
                 return;
             }
 
@@ -99,11 +126,44 @@ public class Node : MonoBehaviour
         {
             if (node != this && node != targetNode && node.IsOccupied())
             {
+                // If the moving unit is a Player
+                if (unit is Player)
+                {
+                    var enemy = FindObjectsByType<Enemy>(FindObjectsSortMode.None).FirstOrDefault(e => e.currentNode == node);
+                    var enemySidekick = FindObjectsByType<Sidekick>(FindObjectsSortMode.None).FirstOrDefault(s => s.currentNode == node && s.owner is Enemy);
+
+                    return enemy != null || enemySidekick != null;
+                }
+                // If the moving unit is a Sidekick
+                else if (unit is Sidekick sidekick)
+                {
+                    if (sidekick.owner is Player)
+                    {
+                        var enemy = FindObjectsByType<Enemy>(FindObjectsSortMode.None).FirstOrDefault(e => e.currentNode == node);
+                        var enemySidekick = FindObjectsByType<Sidekick>(FindObjectsSortMode.None).FirstOrDefault(s => s.currentNode == node && s.owner is Enemy);
+                        return enemy != null || enemySidekick != null;
+                    }
+                    else if (sidekick.owner is Enemy)
+                    {
+                        var player = FindObjectsByType<Player>(FindObjectsSortMode.None).FirstOrDefault(p => p.currentNode == node);
+                        var friendlySidekick = FindObjectsByType<Sidekick>(FindObjectsSortMode.None).FirstOrDefault(s => s.currentNode == node && s.owner is Player);
+                        return player != null || friendlySidekick != null;
+                    }
+                }
+                // If the moving unit is an Enemy
+                else if (unit is Enemy)
+                {
+                    var player = FindObjectsByType<Player>(FindObjectsSortMode.None).FirstOrDefault(p => p.currentNode == node);
+                    var friendlySidekick = FindObjectsByType<Sidekick>(FindObjectsSortMode.None).FirstOrDefault(s => s.currentNode == node && s.owner is Player);
+                    return player != null || friendlySidekick != null;
+                }
+
                 return true;
             }
         }
         return false;
     }
+
 
     private IEnumerable<Node> GetPathToNode(Node targetNode)
     {

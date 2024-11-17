@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Linq;
+using System.Collections;
 
 public static class BigfootCardEffects
 {
@@ -43,22 +44,33 @@ public static class BigfootCardEffects
                 MonoBehaviour[] selectableUnits = { combatManager.player, combatManager.enemy };
                 movementUI.StartUnitSelection(selectableUnits.ToList(), (selected) =>
                     EffectManager.Instance.MovePlayer(selected, 2, true));
-
             }
         }
     }
-
-
 
     public static void Crashthroughthetrees(Card card, MonoBehaviour source, bool wonCombat)
     {
         Debug.Log($"Executing Crash Through Trees effect");
         if (source is Player player)
         {
-            EffectManager.Instance.MovePlayer(player, 5, true);
+            var effectManager = EffectManager.Instance;
+            effectManager.StartEffect();
+            var movementUI = Object.FindFirstObjectByType<MovementUI>();
+
+            effectManager.MovePlayer(player, 5, true);
+
+            Object.FindFirstObjectByType<MonoBehaviour>().StartCoroutine(WaitForMovement(movementUI));
         }
     }
 
+    private static IEnumerator WaitForMovement(MovementUI movementUI)
+    {
+        while (!movementUI.IsMovementComplete)
+        {
+            yield return null;
+        }
+        EffectManager.Instance.CompleteEffect();
+    }
 
     public static void Momentousshift(Card card, MonoBehaviour source, bool wonCombat)
     {

@@ -38,6 +38,28 @@ public class TestManager : MonoBehaviour
         {
             CreateSkirmishCards();
         }
+        if (Input.GetKeyDown(KeyCode.T))
+        {
+            CreateCrashThroughTreesCard();
+        }
+    }
+
+    private void CreateCrashThroughTreesCard()
+    {
+        Card crashCard = new Card(
+            "Crash through the trees",
+            0,
+            0,
+            CardType.Scheme,
+            "Move up to 5 spaces, ignoring enemy units.",
+            1,
+            "",
+            CardEffectTiming.Immediately  // Changed from None to Immediately
+        );
+
+        player.hand.Add(crashCard);
+        handDisplay.DisplayHand(player.hand, player.SelectCard);
+        Debug.Log("Added Crash through the trees card to player's hand");
     }
 
     private void CreateSkirmishCards()

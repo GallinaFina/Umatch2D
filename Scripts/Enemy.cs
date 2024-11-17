@@ -209,7 +209,10 @@ public class Enemy : MonoBehaviour
             return;
         }
 
-        if (!throughUnits && currentNode.PathBlockedByUnit(targetNode, this))
+        bool isRegularMovement = actionManager.currentAction == ActionState.Maneuvering ||
+                                actionManager.currentAction == ActionState.BoostedManeuvering;
+
+        if (isRegularMovement && !throughUnits && currentNode.PathBlockedByUnit(targetNode, this))
         {
             Debug.LogError("Cannot move through enemy units without special movement.");
             return;
@@ -224,6 +227,15 @@ public class Enemy : MonoBehaviour
             movement -= steps;
             Debug.Log(gameObject.tag + " moved to node: " + targetNode.nodeName + ". Remaining movement: " + movement);
             HighlightNodesInRange();
+
+            if (movement <= 0)
+            {
+                var movementUI = FindFirstObjectByType<MovementUI>();
+                if (movementUI != null)
+                {
+                    movementUI.MarkUnitMoved(this);
+                }
+            }
         }
         else
         {

@@ -55,7 +55,7 @@ public class Sidekick : MonoBehaviour
             return;
         }
 
-        if (!throughUnits && currentNode.PathBlockedByUnit(targetNode))
+        if (!throughUnits && currentNode.PathBlockedByUnit(targetNode, this))
         {
             Debug.LogError("Cannot move through enemy units without special movement.");
             return;
@@ -69,7 +69,6 @@ public class Sidekick : MonoBehaviour
             movement -= steps;
             HighlightNodesInRange();
 
-            // End movement if no movement points left
             if (movement <= 0)
             {
                 var movementUI = FindFirstObjectByType<MovementUI>();

@@ -5,6 +5,7 @@ public class EffectManager : MonoBehaviour
 {
     private static EffectManager instance;
     public static EffectManager Instance => instance;
+    public bool IsEffectComplete { get; private set; } = true;
 
     private void Awake()
     {
@@ -12,6 +13,16 @@ public class EffectManager : MonoBehaviour
             instance = this;
         else
             Destroy(gameObject);
+    }
+
+    public void StartEffect()
+    {
+        IsEffectComplete = false;
+    }
+
+    public void CompleteEffect()
+    {
+        IsEffectComplete = true;
     }
 
     public void ResolveCardEffect(Card card, Player source, Enemy target)
@@ -36,7 +47,12 @@ public class EffectManager : MonoBehaviour
         var method = typeof(BigfootCardEffects).GetMethod(methodName);
         if (method != null)
         {
+            StartEffect();
             method.Invoke(null, new object[] { card, source, wonCombat });
+        }
+        else
+        {
+            CompleteEffect();
         }
     }
 
@@ -44,18 +60,15 @@ public class EffectManager : MonoBehaviour
     {
         Debug.Log($"Resolving effect for {card.name} with timing {card.effectTiming}");
 
-        // Get the character's deck name from the source
         string deckName = "";
         if (source is Player player)
             deckName = player.deck.name;
         else if (source is Enemy enemy)
             deckName = enemy.deck.name;
 
-        // Construct the effect library class name
         string effectLibrary = $"{deckName}CardEffects";
         Debug.Log($"Looking for method: {card.name.Replace(" ", "").Replace("'", "")} in {effectLibrary}");
 
-        // Get the effect library type dynamically
         var libraryType = System.Type.GetType(effectLibrary);
         if (libraryType != null)
         {
@@ -64,16 +77,16 @@ public class EffectManager : MonoBehaviour
             {
                 Debug.Log($"Found method {card.name.Replace(" ", "")}, executing...");
                 bool wonCombat = DetermineWonCombat(source);
+                StartEffect();
                 method.Invoke(null, new object[] { card, source, wonCombat });
             }
             else
             {
                 Debug.LogError($"Method {card.name.Replace(" ", "")} not found in {effectLibrary}");
+                CompleteEffect();
             }
         }
     }
-
-
 
     private bool DetermineWonCombat(MonoBehaviour source)
     {
@@ -94,6 +107,7 @@ public class EffectManager : MonoBehaviour
 
     public void DrawCards(MonoBehaviour target, int amount)
     {
+        StartEffect();
         for (int i = 0; i < amount; i++)
         {
             if (target is Player p)
@@ -110,80 +124,93 @@ public class EffectManager : MonoBehaviour
                 handDisplay.DisplayHand(player.hand, player.SelectCard);
             }
         }
+        CompleteEffect();
     }
 
     public void CancelEffects(Card targetCard)
     {
+        StartEffect();
         Debug.Log($"Canceling effects on {targetCard.name}");
         targetCard.effectTiming = CardEffectTiming.None;
+        CompleteEffect();
     }
 
     public void MovePlayer(MonoBehaviour unit, int maxSpaces, bool throughUnits = false)
     {
+        StartEffect();
         Debug.Log($"Setting up movement for {unit.gameObject.name} with {maxSpaces} spaces");
 
-        // Store original action state
         var originalAction = unit is Player player ?
             player.actionManager.currentAction :
             ((Enemy)unit).actionManager.currentAction;
         Debug.Log($"Original action state: {originalAction}");
 
-        // Set up movement state
         if (unit is Player selectedPlayer)
         {
-            selectedPlayer.actionManager.StartAction(ActionState.Maneuvering);
+            if (originalAction == ActionState.None)
+            {
+                selectedPlayer.actionManager.StartAction(ActionState.Maneuvering);
+            }
             selectedPlayer.movement = maxSpaces;
             selectedPlayer.HighlightNodesInRange();
             Debug.Log($"Player movement set to: {selectedPlayer.movement}, Action state: {selectedPlayer.actionManager.currentAction}");
         }
         else if (unit is Enemy selectedEnemy)
         {
-            selectedEnemy.actionManager.StartAction(ActionState.Maneuvering);
+            if (originalAction == ActionState.None)
+            {
+                selectedEnemy.actionManager.StartAction(ActionState.Maneuvering);
+            }
             selectedEnemy.movement = maxSpaces;
             selectedEnemy.HighlightNodesInRange();
             Debug.Log($"Enemy movement set to: {selectedEnemy.movement}, Action state: {selectedEnemy.actionManager.currentAction}");
         }
 
+        StartCoroutine(WaitForMovementToComplete(unit, originalAction));
         Debug.Log($"Movement setup completed for {unit.gameObject.name}");
     }
 
-
-    private IEnumerator HandleForcedMovement(MonoBehaviour unit, ActionState originalAction)
+    private IEnumerator WaitForMovementToComplete(MonoBehaviour unit, ActionState originalAction)
     {
-        if (unit is Player player)
+        var movementUI = FindFirstObjectByType<MovementUI>();
+        while (!movementUI.IsMovementComplete)
         {
-            player.HighlightNodesInRange();
-            while (player.movement > 0)
-            {
-                yield return null;
-            }
-            player.actionManager.StartAction(originalAction);
+            yield return null;
         }
-        else if (unit is Enemy enemy)
+
+        if (originalAction != ActionState.None)
         {
-            enemy.HighlightNodesInRange();
-            while (enemy.movement > 0)
+            if (unit is Player player)
             {
-                yield return null;
+                player.actionManager.currentAction = originalAction;
             }
-            enemy.actionManager.StartAction(originalAction);
+            else if (unit is Enemy enemy)
+            {
+                enemy.actionManager.currentAction = originalAction;
+            }
         }
+
+        CompleteEffect();
     }
-
-
 
     public void ModifyCardPower(Card card, int newPower)
     {
+        StartEffect();
         card.power = newPower;
+        CompleteEffect();
     }
 
     public void DealBonusDamage(Player source, Enemy target, int amount)
     {
+        StartEffect();
         target.TakeDamage(amount);
+        CompleteEffect();
     }
 
     public void GainAction(TurnManager turnManager)
     {
+        StartEffect();
         // Logic to add an action to the current turn
+        CompleteEffect();
     }
 }
