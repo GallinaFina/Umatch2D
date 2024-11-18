@@ -3,18 +3,17 @@ using UnityEngine;
 public class ActionManager : MonoBehaviour
 {
     public ActionState currentAction { get; set; } = ActionState.None;
-    private TurnManager turnManager;
     private MonoBehaviour currentUnit;
     private bool hasMovedThisTurn = false;
 
     private void Start()
     {
-        turnManager = FindFirstObjectByType<TurnManager>();
+        ServiceLocator.Instance.TurnManager.RegisterActionManager(this);
     }
 
     public bool CanPerformAction(ActionState newAction)
     {
-        if (!turnManager.CanPerformAction())
+        if (!ServiceLocator.Instance.TurnManager.CanPerformAction())
             return false;
 
         switch (newAction)
@@ -41,16 +40,12 @@ public class ActionManager : MonoBehaviour
     {
         currentUnit = unit ?? GetComponent<MonoBehaviour>();
         currentAction = action;
-        turnManager.TrackActionState(currentUnit, action);
+        ServiceLocator.Instance.TurnManager.TrackActionState(currentUnit, action);
 
         if (action == ActionState.Maneuvering)
         {
             hasMovedThisTurn = true;
-            var movementUI = FindFirstObjectByType<MovementUI>();
-            if (movementUI != null)
-            {
-                movementUI.ResetMovedUnits();
-            }
+            ServiceLocator.Instance.MovementUI?.ResetMovedUnits();
         }
     }
 
@@ -58,14 +53,9 @@ public class ActionManager : MonoBehaviour
     {
         if (currentAction != ActionState.None)
         {
-            var movementUI = FindFirstObjectByType<MovementUI>();
-            if (movementUI != null)
-            {
-                movementUI.ResetMovedUnits();
-            }
-
-            turnManager.PerformAction(ConvertToTurnAction(currentAction));
-            turnManager.TrackActionState(currentUnit, ActionState.None);
+            ServiceLocator.Instance.MovementUI?.ResetMovedUnits();
+            ServiceLocator.Instance.TurnManager.PerformAction(ConvertToTurnAction(currentAction));
+            ServiceLocator.Instance.TurnManager.TrackActionState(currentUnit, ActionState.None);
 
             if (currentAction == ActionState.Maneuvering ||
                 currentAction == ActionState.BoostedManeuvering)

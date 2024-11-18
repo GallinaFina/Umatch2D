@@ -1,5 +1,8 @@
 using UnityEngine;
 using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+
 
 public class EffectManager : MonoBehaviour
 {
@@ -10,9 +13,14 @@ public class EffectManager : MonoBehaviour
     private void Awake()
     {
         if (instance == null)
+        {
             instance = this;
+            ServiceLocator.Instance.RegisterService(this);
+        }
         else
+        {
             Destroy(gameObject);
+        }
     }
 
     public void StartEffect()
@@ -30,7 +38,7 @@ public class EffectManager : MonoBehaviour
         Debug.Log($"Resolving effect for {card.name} with timing {card.effectTiming}");
 
         bool wonCombat = false;
-        var combatManager = FindFirstObjectByType<CombatManager>();
+        var combatManager = ServiceLocator.Instance.CombatManager;
         if (combatManager != null)
         {
             if (source == combatManager.player)
@@ -65,6 +73,13 @@ public class EffectManager : MonoBehaviour
             deckName = player.deck.name;
         else if (source is Enemy enemy)
             deckName = enemy.deck.name;
+        else if (source is Sidekick sidekick && sidekick.owner != null)
+        {
+            if (sidekick.owner is Player p)
+                deckName = p.deck.name;
+            else if (sidekick.owner is Enemy e)
+                deckName = e.deck.name;
+        }
 
         string effectLibrary = $"{deckName}CardEffects";
         Debug.Log($"Looking for method: {card.name.Replace(" ", "").Replace("'", "")} in {effectLibrary}");
@@ -90,10 +105,10 @@ public class EffectManager : MonoBehaviour
 
     private bool DetermineWonCombat(MonoBehaviour source)
     {
-        var combatManager = FindFirstObjectByType<CombatManager>();
+        var combatManager = ServiceLocator.Instance.CombatManager;
         if (combatManager != null)
         {
-            if (source is Player)
+            if (source is Player || (source is Sidekick s && s.owner is Player))
             {
                 return combatManager.DetermineWinner(combatManager.attackCard, combatManager.defendCard);
             }
@@ -118,11 +133,7 @@ public class EffectManager : MonoBehaviour
 
         if (target is Player player)
         {
-            var handDisplay = FindFirstObjectByType<HandDisplay>();
-            if (handDisplay != null)
-            {
-                handDisplay.DisplayHand(player.hand, player.SelectCard);
-            }
+            ServiceLocator.Instance.HandDisplay?.DisplayHand(player.hand, player.SelectCard);
         }
         CompleteEffect();
     }
@@ -172,7 +183,7 @@ public class EffectManager : MonoBehaviour
 
     private IEnumerator WaitForMovementToComplete(MonoBehaviour unit, ActionState originalAction)
     {
-        var movementUI = FindFirstObjectByType<MovementUI>();
+        var movementUI = ServiceLocator.Instance.MovementUI;
         while (!movementUI.IsMovementComplete)
         {
             yield return null;

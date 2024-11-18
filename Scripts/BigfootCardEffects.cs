@@ -8,26 +8,27 @@ public static class BigfootCardEffects
     {
         Debug.Log($"Executing Regroup effect. Won combat: {wonCombat}");
         int cardsToDraw = wonCombat ? 2 : 1;
-        EffectManager.Instance.DrawCards(source, cardsToDraw);
+        ServiceLocator.Instance.EffectManager.DrawCards(source, cardsToDraw);
     }
 
     public static void Itsjustyourimagination(Card card, MonoBehaviour source, bool wonCombat)
     {
         Debug.Log($"Executing It's just your imagination effect");
-        var combatManager = Object.FindFirstObjectByType<CombatManager>();
+        var combatManager = ServiceLocator.Instance.CombatManager;
         if (combatManager != null)
         {
-            EffectManager.Instance.CancelEffects(combatManager.attackCard);
+            ServiceLocator.Instance.EffectManager.CancelEffects(combatManager.attackCard);
         }
     }
 
     public static void Feint(Card card, MonoBehaviour source, bool wonCombat)
     {
         Debug.Log($"Executing Feint effect");
-        var combatManager = Object.FindFirstObjectByType<CombatManager>();
+        var combatManager = ServiceLocator.Instance.CombatManager;
         if (combatManager != null)
         {
-            EffectManager.Instance.CancelEffects(combatManager.attackCard);
+            var targetCard = source is Player ? combatManager.defendCard : combatManager.attackCard;
+            ServiceLocator.Instance.EffectManager.CancelEffects(targetCard);
         }
     }
 
@@ -36,14 +37,14 @@ public static class BigfootCardEffects
         Debug.Log($"Executing Skirmish effect. Combat won: {wonCombat}");
         if (wonCombat)
         {
-            var combatManager = Object.FindFirstObjectByType<CombatManager>();
-            var movementUI = Object.FindFirstObjectByType<MovementUI>();
+            var combatManager = ServiceLocator.Instance.CombatManager;
+            var movementUI = ServiceLocator.Instance.MovementUI;
 
             if (combatManager != null && movementUI != null)
             {
                 MonoBehaviour[] selectableUnits = { combatManager.player, combatManager.enemy };
                 movementUI.StartUnitSelection(selectableUnits.ToList(), (selected) =>
-                    EffectManager.Instance.MovePlayer(selected, 2, true));
+                    ServiceLocator.Instance.EffectManager.MovePlayer(selected, 2, true));
             }
         }
     }
@@ -53,13 +54,13 @@ public static class BigfootCardEffects
         Debug.Log($"Executing Crash Through Trees effect");
         if (source is Player player)
         {
-            var effectManager = EffectManager.Instance;
+            var effectManager = ServiceLocator.Instance.EffectManager;
             effectManager.StartEffect();
-            var movementUI = Object.FindFirstObjectByType<MovementUI>();
+            var movementUI = ServiceLocator.Instance.MovementUI;
 
             effectManager.MovePlayer(player, 5, true);
 
-            Object.FindFirstObjectByType<MonoBehaviour>().StartCoroutine(WaitForMovement(movementUI));
+            ServiceLocator.Instance.GameManager.StartCoroutine(WaitForMovement(movementUI));
         }
     }
 
@@ -69,10 +70,10 @@ public static class BigfootCardEffects
         {
             yield return null;
         }
-        EffectManager.Instance.CompleteEffect();
+        ServiceLocator.Instance.EffectManager.CompleteEffect();
     }
 
-    public static void Momentousshift(Card card, MonoBehaviour source, bool wonCombat)
+    public static void MomentousShift(Card card, MonoBehaviour source, bool wonCombat)
     {
         Debug.Log($"Executing Momentous shift effect check for {source.gameObject.tag}");
 
@@ -83,7 +84,7 @@ public static class BigfootCardEffects
             if (player.currentNode != player.GetStartingNode())
             {
                 Debug.Log($"Player Momentous shift power before: {card.power}");
-                EffectManager.Instance.ModifyCardPower(card, card.power + 2);
+                ServiceLocator.Instance.EffectManager.ModifyCardPower(card, card.power + 2);
                 Debug.Log($"Player Momentous shift power after: {card.power}");
             }
             else
@@ -106,7 +107,7 @@ public static class BigfootCardEffects
             if (enemy.currentNode != startingNode)
             {
                 Debug.Log($"Enemy Momentous shift power before: {card.power}");
-                EffectManager.Instance.ModifyCardPower(card, card.power + 2);
+                ServiceLocator.Instance.EffectManager.ModifyCardPower(card, card.power + 2);
                 Debug.Log($"Enemy Momentous shift power after: {card.power}");
             }
             else

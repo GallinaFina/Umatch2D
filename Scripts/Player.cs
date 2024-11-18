@@ -3,38 +3,20 @@ using UnityEngine;
 using System.Linq;
 using System.Collections;
 
-public class Player : MonoBehaviour
+public class Player : BaseUnit
 {
     [SerializeField]
     public List<Card> hand;
     public Deck deck;
-    public int movement;
-    public Node currentNode;
-    public Node startingNode;
     public SpriteRenderer characterPortrait;
-    public ActionManager actionManager;
     public List<Sidekick> sidekicks = new List<Sidekick>();
-
-    public int maxHP;
-    public int currentHP;
-
-    public enum CombatType { Melee, Ranged }
-    public CombatType combatType;
-
     private bool canBoost = false;
     public bool CanBoost => canBoost;
-
-    void Start()
-    {
-        actionManager = gameObject.AddComponent<ActionManager>();
-    }
 
     public void Initialize(Deck chosenDeck, CombatType type)
     {
         deck = chosenDeck;
-        combatType = type;
-        maxHP = deck.startingHealth;
-        currentHP = maxHP;
+        base.Initialize(chosenDeck.startingHealth, type);
 
         string portraitPath = "Images/Portraits/" + chosenDeck.name;
         Sprite portrait = Resources.Load<Sprite>(portraitPath);
@@ -43,23 +25,6 @@ public class Player : MonoBehaviour
             characterPortrait.sprite = portrait;
         }
     }
-
-    public void SetStartingNode()
-    {
-        startingNode = currentNode;
-    }
-
-    public Node GetStartingNode()
-    {
-        return startingNode;
-    }
-
-    public void TakeDamage(int amount)
-    {
-        currentHP -= amount;
-        Debug.Log($"{gameObject.tag} took {amount} damage. HP: {currentHP}/{maxHP}");
-    }
-
 
     public void DrawCard()
     {
@@ -97,7 +62,7 @@ public class Player : MonoBehaviour
                 sidekick.movement = deck.baseMovement;
             }
 
-            var movementUI = FindFirstObjectByType<MovementUI>();
+            var movementUI = ServiceLocator.Instance.MovementUI;
             if (movementUI != null)
             {
                 List<MonoBehaviour> selectableUnits = new List<MonoBehaviour> { this };
@@ -105,11 +70,7 @@ public class Player : MonoBehaviour
                 movementUI.StartUnitSelection(selectableUnits, OnUnitSelected);
             }
 
-            var handDisplay = FindFirstObjectByType<HandDisplay>();
-            if (handDisplay != null)
-            {
-                handDisplay.DisplayHand(hand, SelectCard);
-            }
+            ServiceLocator.Instance.HandDisplay?.DisplayHand(hand, SelectCard);
         }
     }
 
@@ -131,12 +92,7 @@ public class Player : MonoBehaviour
         {
             hand.Remove(card);
             Debug.Log("Discarded: " + card.name + ". Current hand: " + string.Join(", ", hand.Select(c => c.name)));
-
-            var handDisplay = FindFirstObjectByType<HandDisplay>();
-            if (handDisplay != null)
-            {
-                handDisplay.DisplayHand(hand, SelectCard);
-            }
+            ServiceLocator.Instance.HandDisplay?.DisplayHand(hand, SelectCard);
         }
     }
 
@@ -158,7 +114,7 @@ public class Player : MonoBehaviour
             canBoost = false;
             Debug.Log($"Boosted movement by: {boostAmount} for all units");
 
-            var movementUI = FindFirstObjectByType<MovementUI>();
+            var movementUI = ServiceLocator.Instance.MovementUI;
             if (movementUI != null && movementUI.CurrentlySelectedUnit != null)
             {
                 OnUnitSelected(movementUI.CurrentlySelectedUnit);
@@ -172,7 +128,7 @@ public class Player : MonoBehaviour
         {
             actionManager.StartAction(ActionState.Scheming);
             Debug.Log("Using scheme card: " + card.name);
-            EffectManager.Instance.StartEffect();
+            ServiceLocator.Instance.EffectManager.StartEffect();
             card.TriggerEffect(this, null);
             DiscardCard(card);
             StartCoroutine(WaitForEffectThenEndScheme());
@@ -181,16 +137,12 @@ public class Player : MonoBehaviour
 
     private IEnumerator WaitForEffectThenEndScheme()
     {
-        while (!EffectManager.Instance.IsEffectComplete)
+        while (!ServiceLocator.Instance.EffectManager.IsEffectComplete)
         {
             yield return null;
         }
 
-        var turnManager = FindFirstObjectByType<TurnManager>();
-        if (turnManager != null)
-        {
-            turnManager.PerformAction(TurnManager.ActionType.Scheme);
-        }
+        ServiceLocator.Instance.TurnManager?.PerformAction(TurnManager.ActionType.Scheme);
         actionManager.EndAction();
     }
 
@@ -201,8 +153,6 @@ public class Player : MonoBehaviour
             Debug.Log($"Card {card.name} cannot be used by {gameObject.name}");
             return;
         }
-
-        var turnManager = FindFirstObjectByType<TurnManager>();
 
         if ((actionManager.currentAction == ActionState.Maneuvering ||
              actionManager.currentAction == ActionState.BoostedManeuvering) &&
@@ -221,7 +171,7 @@ public class Player : MonoBehaviour
                 break;
 
             case CardType.Scheme:
-                if (turnManager.CanPerformAction())
+                if (ServiceLocator.Instance.TurnManager.CanPerformAction())
                     UseSchemeCard(card);
                 break;
         }
@@ -229,18 +179,41 @@ public class Player : MonoBehaviour
 
     private void SelectCardForAttack(Card card)
     {
-        if (combatType == CombatType.Melee && !currentNode.IsConnectedTo(FindFirstObjectByType<Enemy>().currentNode))
+        var enemy = ServiceLocator.Instance.GameManager.enemy;
+        var enemySidekick = ServiceLocator.Instance.GameManager.GetSidekickForOwner(enemy);
+        List<MonoBehaviour> validAttackers = new List<MonoBehaviour>();
+
+        // Check if player is in valid attack position (against either enemy or their sidekick)
+        if ((combatType != CombatType.Melee) ||
+            currentNode.IsConnectedTo(enemy.currentNode) ||
+            (enemySidekick != null && currentNode.IsConnectedTo(enemySidekick.currentNode)))
         {
-            Debug.LogError("Not in melee range to attack.");
-            return;
+            validAttackers.Add(this);
         }
 
-        var combatManager = FindFirstObjectByType<CombatManager>();
-        if (combatManager != null)
+        // Check if sidekicks are in valid attack position
+        foreach (var sidekick in sidekicks)
         {
-            actionManager.StartAction(ActionState.Attacking);
-            DiscardCard(card);
-            combatManager.InitiateAttack(this, card);
+            if (sidekick.combatType != CombatType.Melee ||
+                sidekick.currentNode.IsConnectedTo(enemy.currentNode) ||
+                (enemySidekick != null && sidekick.currentNode.IsConnectedTo(enemySidekick.currentNode)))
+            {
+                validAttackers.Add(sidekick);
+            }
+        }
+
+        if (validAttackers.Count > 0)
+        {
+            ServiceLocator.Instance.MovementUI.StartUnitSelection(validAttackers, unit =>
+            {
+                actionManager.StartAction(ActionState.Attacking);
+                DiscardCard(card);
+                ServiceLocator.Instance.CombatManager.InitiateAttack(unit, card);
+            });
+        }
+        else
+        {
+            Debug.LogError("No units in range to attack.");
         }
     }
 
@@ -263,126 +236,12 @@ public class Player : MonoBehaviour
     {
         if (card.cardType == CardType.Defense || card.cardType == CardType.Versatile)
         {
-            var combatManager = FindFirstObjectByType<CombatManager>();
+            var combatManager = ServiceLocator.Instance.CombatManager;
             if (combatManager != null)
             {
                 DiscardCard(card);
                 combatManager.DefendWith(this);
             }
-        }
-    }
-
-    public void HighlightNodesInRange()
-    {
-        ResetHighlights();
-
-        Queue<(Node, int)> queue = new Queue<(Node, int)>();
-        HashSet<Node> visited = new HashSet<Node>();
-        queue.Enqueue((currentNode, 0));
-        visited.Add(currentNode);
-
-        while (queue.Count > 0)
-        {
-            var (node, steps) = queue.Dequeue();
-            foreach (Node connection in node.connections)
-            {
-                if (!visited.Contains(connection) && steps + 1 <= movement)
-                {
-                    connection.Highlight(true);
-                    queue.Enqueue((connection, steps + 1));
-                    visited.Add(connection);
-                }
-            }
-        }
-    }
-
-    public void MoveToNode(Node targetNode, bool throughUnits = false)
-    {
-        if (currentNode == null)
-        {
-            Debug.LogError("Current node is not set for: " + gameObject.tag);
-            return;
-        }
-
-        if (targetNode == null)
-        {
-            Debug.LogError("Target node is not set for: " + gameObject.tag);
-            return;
-        }
-
-        if (targetNode.IsOccupied())
-        {
-            Debug.LogError("Target node is occupied: " + targetNode.nodeName);
-            return;
-        }
-
-        bool isRegularMovement = actionManager.currentAction == ActionState.Maneuvering ||
-                                actionManager.currentAction == ActionState.BoostedManeuvering;
-
-        if (isRegularMovement && !throughUnits && currentNode.PathBlockedByUnit(targetNode, this))
-        {
-            Debug.LogError("Cannot move through enemy units without special movement.");
-            return;
-        }
-
-        Debug.Log(gameObject.tag + " attempting to move to node: " + targetNode.nodeName);
-        int steps = CalculateStepsToNode(targetNode);
-        if (steps <= movement)
-        {
-            currentNode = targetNode;
-            transform.position = targetNode.transform.position;
-            movement -= steps;
-            Debug.Log(gameObject.tag + " moved to node: " + targetNode.nodeName + ". Remaining movement: " + movement);
-            HighlightNodesInRange();
-
-            if (movement <= 0)
-            {
-                var movementUI = FindFirstObjectByType<MovementUI>();
-                if (movementUI != null)
-                {
-                    movementUI.MarkUnitMoved(this);
-                }
-            }
-        }
-        else
-        {
-            Debug.Log(gameObject.tag + " does not have enough movement left.");
-        }
-    }
-
-    private int CalculateStepsToNode(Node targetNode)
-    {
-        Queue<(Node, int)> queue = new Queue<(Node, int)>();
-        HashSet<Node> visited = new HashSet<Node>();
-        queue.Enqueue((currentNode, 0));
-        visited.Add(currentNode);
-
-        while (queue.Count > 0)
-        {
-            var (node, steps) = queue.Dequeue();
-            if (node == targetNode)
-            {
-                return steps;
-            }
-
-            foreach (Node connection in node.connections)
-            {
-                if (!visited.Contains(connection))
-                {
-                    queue.Enqueue((connection, steps + 1));
-                    visited.Add(connection);
-                }
-            }
-        }
-
-        return int.MaxValue;
-    }
-
-    private void ResetHighlights()
-    {
-        foreach (Node node in FindObjectsByType<Node>(FindObjectsInactive.Include, FindObjectsSortMode.None))
-        {
-            node.Highlight(false);
         }
     }
 
@@ -401,16 +260,8 @@ public class Player : MonoBehaviour
             }
 
             ResetHighlights();
-
-            var movementUI = FindFirstObjectByType<MovementUI>();
-            if (movementUI != null)
-            {
-                movementUI.ResetMovedUnits();
-            }
-
-            // Let ActionManager handle the turn action and state changes
+            ServiceLocator.Instance.MovementUI?.ResetMovedUnits();
             actionManager.EndAction();
         }
     }
 }
-

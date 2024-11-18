@@ -3,25 +3,15 @@ using System.Collections;
 
 public class TestManager : MonoBehaviour
 {
-    private CombatManager combatManager;
-    private Player player;
-    private Enemy enemy;
-    private Board board;
-    private HandDisplay handDisplay;
-
     void Start()
     {
-        StartCoroutine(InitializeReferences());
+        StartCoroutine(WaitForServiceInitialization());
     }
 
-    private IEnumerator InitializeReferences()
+    private IEnumerator WaitForServiceInitialization()
     {
         yield return null;
-        combatManager = FindFirstObjectByType<CombatManager>();
-        player = FindFirstObjectByType<Player>();
-        enemy = FindFirstObjectByType<Enemy>();
-        board = FindFirstObjectByType<Board>();
-        handDisplay = FindFirstObjectByType<HandDisplay>();
+        // Services are now initialized
     }
 
     void Update()
@@ -54,11 +44,12 @@ public class TestManager : MonoBehaviour
             "Move up to 5 spaces, ignoring enemy units.",
             1,
             "",
-            CardEffectTiming.Immediately  // Changed from None to Immediately
+            CardEffectTiming.Immediately
         );
 
+        var player = ServiceLocator.Instance.GameManager.player;
         player.hand.Add(crashCard);
-        handDisplay.DisplayHand(player.hand, player.SelectCard);
+        ServiceLocator.Instance.HandDisplay.DisplayHand(player.hand, player.SelectCard);
         Debug.Log("Added Crash through the trees card to player's hand");
     }
 
@@ -67,24 +58,26 @@ public class TestManager : MonoBehaviour
         Card playerSkirmish = new Card("Skirmish", 3, 1, CardType.Versatile, "After combat: If you won the combat, choose one of the fighters in the combat and move them up to 2 spaces", 1, "", CardEffectTiming.AfterCombat);
         Card enemySkirmish = new Card("Skirmish", 3, 1, CardType.Versatile, "After combat: If you won the combat, choose one of the fighters in the combat and move them up to 2 spaces", 1, "", CardEffectTiming.AfterCombat);
 
-        player.hand.Add(playerSkirmish);
-        enemy.hand.Add(enemySkirmish);
+        var game = ServiceLocator.Instance.GameManager;
+        game.player.hand.Add(playerSkirmish);
+        game.enemy.hand.Add(enemySkirmish);
 
-        handDisplay.DisplayHand(player.hand, player.SelectCard);
+        ServiceLocator.Instance.HandDisplay.DisplayHand(game.player.hand, game.player.SelectCard);
         Debug.Log("Created Skirmish cards for both players");
     }
 
     private void ClearAllHands()
     {
-        player.hand.Clear();
-        enemy.hand.Clear();
-        handDisplay.DisplayHand(player.hand, player.SelectCard);
+        var game = ServiceLocator.Instance.GameManager;
+        game.player.hand.Clear();
+        game.enemy.hand.Clear();
+        ServiceLocator.Instance.HandDisplay.DisplayHand(game.player.hand, game.player.SelectCard);
         Debug.Log("Cleared all hands");
     }
 
     private void ClearEnemyHand()
     {
-        enemy.hand.Clear();
+        ServiceLocator.Instance.GameManager.enemy.hand.Clear();
         Debug.Log("Cleared enemy hands");
     }
 }

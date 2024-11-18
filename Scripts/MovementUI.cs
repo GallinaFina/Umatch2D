@@ -19,11 +19,16 @@ public class MovementUI : MonoBehaviour
     public Material movedMaterial;
     private Dictionary<MonoBehaviour, Material> originalMaterials = new Dictionary<MonoBehaviour, Material>();
 
+    void Start()
+    {
+        ServiceLocator.Instance.RegisterService(this);
+    }
+
     public void StartUnitSelection(List<MonoBehaviour> units, Action<MonoBehaviour> callback)
     {
         Debug.Log($"Starting unit selection with {units.Count} units");
         IsMovementComplete = false;
-        selectableUnits = units.Where(u => !movedUnits.Contains(u)).ToList();
+        selectableUnits = units;
         onUnitSelected = callback;
         isSelectingUnit = true;
 
@@ -35,15 +40,6 @@ public class MovementUI : MonoBehaviour
             {
                 originalMaterials[unit] = renderer.material;
                 renderer.material = highlightMaterial;
-            }
-        }
-
-        foreach (var unit in movedUnits)
-        {
-            var renderer = unit.GetComponent<Renderer>();
-            if (renderer != null)
-            {
-                renderer.material = movedMaterial;
             }
         }
     }
@@ -60,7 +56,7 @@ public class MovementUI : MonoBehaviour
             if (hit.collider != null)
             {
                 MonoBehaviour clickedUnit = hit.collider.GetComponent<MonoBehaviour>();
-                if (selectableUnits.Contains(clickedUnit) && !movedUnits.Contains(clickedUnit))
+                if (selectableUnits.Contains(clickedUnit))
                 {
                     EndSelection(clickedUnit);
                 }
@@ -73,10 +69,9 @@ public class MovementUI : MonoBehaviour
         Debug.Log($"Ending selection with unit: {selected.gameObject.name}");
         currentlySelectedUnit = selected;
 
-        // Reset materials for unselected units
         foreach (var unit in selectableUnits)
         {
-            if (unit != selected && !movedUnits.Contains(unit))
+            if (unit != selected)
             {
                 var renderer = unit.GetComponent<Renderer>();
                 if (renderer != null && originalMaterials.ContainsKey(unit))
@@ -91,31 +86,36 @@ public class MovementUI : MonoBehaviour
 
     public void MarkUnitMoved(MonoBehaviour unit)
     {
-        if (!movedUnits.Contains(unit))
+        var baseUnit = unit.GetComponent<BaseUnit>();
+        if (baseUnit.movement <= 0)
         {
-            movedUnits.Add(unit);
             var renderer = unit.GetComponent<Renderer>();
             if (renderer != null)
             {
                 renderer.material = movedMaterial;
             }
 
-            // Check if all units have moved
-            if (selectableUnits.All(u => movedUnits.Contains(u)))
+            if (!movedUnits.Contains(unit))
             {
-                IsMovementComplete = true;
-                isSelectingUnit = false;
+                movedUnits.Add(unit);
             }
-            else
-            {
-                // Allow selection of remaining unmoved units
-                var remainingUnits = selectableUnits.Where(u => !movedUnits.Contains(u)).ToList();
-                if (remainingUnits.Any())
-                {
-                    currentlySelectedUnit = null;
-                    isSelectingUnit = true;
-                }
-            }
+        }
+
+        var player = ServiceLocator.Instance.GameManager.player;
+        bool canStillBoost = player.CanBoost &&
+            (player.actionManager.currentAction == ActionState.Maneuvering ||
+             player.actionManager.currentAction == ActionState.BoostedManeuvering);
+
+        if (!canStillBoost && selectableUnits.All(u =>
+            u.GetComponent<BaseUnit>().movement <= 0 && movedUnits.Contains(u)))
+        {
+            IsMovementComplete = true;
+            isSelectingUnit = false;
+        }
+        else
+        {
+            currentlySelectedUnit = null;
+            isSelectingUnit = true;
         }
     }
 
@@ -137,50 +137,5 @@ public class MovementUI : MonoBehaviour
         IsMovementComplete = true;
         currentlySelectedUnit = null;
         isSelectingUnit = false;
-    }
-
-    private IEnumerator WaitForMovement(MonoBehaviour unit)
-    {
-        Debug.Log($"Waiting for movement completion of: {unit.gameObject.name}");
-        if (unit is Player player)
-        {
-            while (player.movement > 0)
-            {
-                yield return null;
-            }
-        }
-        else if (unit is Enemy enemy)
-        {
-            while (enemy.movement > 0)
-            {
-                yield return null;
-            }
-        }
-        else if (unit is Sidekick sidekick)
-        {
-            while (sidekick.movement > 0)
-            {
-                yield return null;
-            }
-        }
-
-        MarkUnitMoved(unit);
-
-        // Check for any units with remaining movement
-        var unitsWithMovement = selectableUnits.Where(u =>
-            !movedUnits.Contains(u) &&
-            ((u is Player p && p.movement > 0) ||
-             (u is Sidekick s && s.movement > 0) ||
-             (u is Enemy e && e.movement > 0))).ToList();
-
-        if (unitsWithMovement.Any())
-        {
-            StartUnitSelection(unitsWithMovement, onUnitSelected);
-        }
-        else
-        {
-            IsMovementComplete = true;
-            isSelectingUnit = false;
-        }
     }
 }

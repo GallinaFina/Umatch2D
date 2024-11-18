@@ -8,6 +8,11 @@ public class HandDisplay : MonoBehaviour
     public GameObject cardPrefab;
     public Transform handArea;
 
+    void Start()
+    {
+        ServiceLocator.Instance.RegisterService(this);
+    }
+
     public void DisplayHand(List<Card> cards, System.Action<Card> onCardSelected)
     {
         Debug.Log($"CardPrefab reference: {cardPrefab != null}");
@@ -19,7 +24,6 @@ public class HandDisplay : MonoBehaviour
         {
             GameObject cardObj = Instantiate(cardPrefab, handArea);
 
-            // Position and scale the card
             RectTransform cardTransform = cardObj.GetComponent<RectTransform>();
             cardTransform.localScale = new Vector3(0.5f, 0.5f, 1f);
             cardTransform.anchoredPosition = new Vector2(100 * cards.IndexOf(card), 0);

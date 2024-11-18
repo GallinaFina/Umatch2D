@@ -8,6 +8,7 @@ public class Board : MonoBehaviour
 
     void Start()
     {
+        ServiceLocator.Instance.RegisterService(this);
         foreach (Node node in nodes)
         {
             Debug.Log("Node found: " + node.nodeName);

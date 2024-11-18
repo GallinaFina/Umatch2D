@@ -22,6 +22,11 @@ public class CombatUI : MonoBehaviour
 
     private CombatPhase currentPhase;
 
+    void Start()
+    {
+        ServiceLocator.Instance.RegisterService(this);
+    }
+
     public void ShowCombatUI(bool show)
     {
         combatPanel.SetActive(show);

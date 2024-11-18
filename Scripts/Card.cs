@@ -40,19 +40,17 @@ public class Card
     public void TriggerEffect(MonoBehaviour source, MonoBehaviour target)
     {
         Debug.Log($"Triggering {effectTiming} effect for {name}");
-        EffectManager.Instance.ResolveCardEffect(this, source, target);
+        ServiceLocator.Instance.EffectManager.ResolveCardEffect(this, source, target);
     }
 
     public bool CanBeUsedBy(MonoBehaviour entity)
     {
-        // For boosting maneuvers, ignore character restrictions
         var actionManager = entity.GetComponent<ActionManager>();
         if (actionManager != null && actionManager.currentAction == ActionState.Maneuvering)
         {
             return true;
         }
 
-        // Normal card usage restrictions
         switch (cardUser)
         {
             case CardUser.Any:

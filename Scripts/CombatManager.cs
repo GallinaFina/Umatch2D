@@ -16,7 +16,12 @@ public class CombatManager : MonoBehaviour
 
     void Start()
     {
-        combatUI = FindFirstObjectByType<CombatUI>();
+        ServiceLocator.Instance.RegisterService(this);
+        combatUI = ServiceLocator.Instance.CombatUI;
+        if (combatUI == null)
+        {
+            Debug.LogError("CombatUI not found in ServiceLocator");
+        }
     }
 
     public void InitiateAttack(MonoBehaviour attackingUnit, Card selectedCard)
@@ -43,14 +48,15 @@ public class CombatManager : MonoBehaviour
     private void RequestDefense()
     {
         List<MonoBehaviour> validDefenders = GetValidDefenders(attacker);
+        Debug.Log($"Found {validDefenders.Count} valid defenders");
 
         if (validDefenders.Count > 0)
         {
-            var movementUI = FindFirstObjectByType<MovementUI>();
-            movementUI.StartUnitSelection(validDefenders, DefendWith);
+            ServiceLocator.Instance.MovementUI.StartUnitSelection(validDefenders, DefendWith);
         }
         else
         {
+            Debug.Log("No valid defenders found, resolving combat without defense");
             ResolveCombat(null);
         }
     }
@@ -61,21 +67,25 @@ public class CombatManager : MonoBehaviour
         Node attackerNode = null;
         bool isMeleeAttacker = false;
 
+        Debug.Log($"Checking valid defenders for attacker: {attacker.name}");
+
         if (attacker is Player player)
         {
             attackerNode = player.currentNode;
-            isMeleeAttacker = player.combatType == Player.CombatType.Melee;
+            isMeleeAttacker = player.combatType == CombatType.Melee;
         }
         else if (attacker is Sidekick sidekick)
         {
             attackerNode = sidekick.currentNode;
-            isMeleeAttacker = sidekick.combatType == Player.CombatType.Melee;
+            isMeleeAttacker = sidekick.combatType == CombatType.Melee;
         }
         else if (attacker is Enemy enemy)
         {
             attackerNode = enemy.currentNode;
-            isMeleeAttacker = enemy.combatType == Player.CombatType.Melee;
+            isMeleeAttacker = enemy.combatType == CombatType.Melee;
         }
+
+        Debug.Log($"Attacker is melee: {isMeleeAttacker}, at node: {attackerNode?.nodeName}");
 
         var potentialDefenders = GetPotentialDefenders(attacker);
 
@@ -86,9 +96,13 @@ public class CombatManager : MonoBehaviour
             else if (defender is Enemy e) defenderNode = e.currentNode;
             else if (defender is Sidekick s) defenderNode = s.currentNode;
 
+            Debug.Log($"Checking defender {defender.name} at node: {defenderNode?.nodeName}");
+            Debug.Log($"Is connected: {!isMeleeAttacker || attackerNode.IsConnectedTo(defenderNode)}");
+
             if (!isMeleeAttacker || attackerNode.IsConnectedTo(defenderNode))
             {
                 defenders.Add(defender);
+                Debug.Log($"Added valid defender: {defender.name}");
             }
         }
 
@@ -98,23 +112,34 @@ public class CombatManager : MonoBehaviour
     private List<MonoBehaviour> GetPotentialDefenders(MonoBehaviour attacker)
     {
         List<MonoBehaviour> defenders = new List<MonoBehaviour>();
+        var game = ServiceLocator.Instance.GameManager;
 
-        if (attacker is Player || attacker is Sidekick sidekickA && sidekickA.owner is Player)
+        Debug.Log($"Getting potential defenders for attacker: {attacker.name}");
+
+        if (attacker is Player || (attacker is Sidekick sidekickA && sidekickA.owner is Player))
         {
-            defenders.Add(FindFirstObjectByType<Enemy>());
-            defenders.AddRange(FindObjectsByType<Sidekick>(FindObjectsSortMode.None)
-                .Where(s => s.owner is Enemy));
+            defenders.Add(game.enemy);
+            var enemySidekick = game.GetSidekickForOwner(game.enemy);
+            Debug.Log($"Enemy sidekick found: {enemySidekick != null}");
+            if (enemySidekick != null)
+            {
+                defenders.Add(enemySidekick);
+            }
         }
         else
         {
-            defenders.Add(FindFirstObjectByType<Player>());
-            defenders.AddRange(FindObjectsByType<Sidekick>(FindObjectsSortMode.None)
-                .Where(s => s.owner is Player));
+            defenders.Add(game.player);
+            defenders.AddRange(game.player.sidekicks);
+        }
+
+        Debug.Log($"Total potential defenders found: {defenders.Count}");
+        foreach (var defender in defenders)
+        {
+            Debug.Log($"Potential defender: {defender.name}");
         }
 
         return defenders;
     }
-
 
     public void DefendWith(MonoBehaviour defendingUnit)
     {
@@ -143,7 +168,6 @@ public class CombatManager : MonoBehaviour
         ResolveCombat(selectedDefenseCard);
     }
 
-
     private void ResolveCombat(Card defenseCard)
     {
         StartCoroutine(ResolveCombatSequence(defenseCard));
@@ -153,29 +177,24 @@ public class CombatManager : MonoBehaviour
     {
         Debug.Log("Beginning combat resolution");
 
-        // Reveal cards
         attackCard.isFaceDown = false;
         if (defenseCard != null)
         {
             defenseCard.isFaceDown = false;
         }
 
-        // Update UI to show revealed cards
         combatUI.DisplayAttackerCard(attackCard);
         combatUI.DisplayDefenderCard(defenseCard);
         yield return new WaitForSeconds(1.5f);
 
-        // Immediate effects
         combatUI.UpdatePhase(CombatUI.CombatPhase.ImmediateEffects);
         ResolveEffects(CardEffectTiming.Immediately);
         yield return new WaitForSeconds(1.5f);
 
-        // During combat effects
         combatUI.UpdatePhase(CombatUI.CombatPhase.DuringCombatEffects);
         ResolveEffects(CardEffectTiming.DuringCombat);
         yield return new WaitForSeconds(1.5f);
 
-        // Compare values and determine winner AFTER effects
         bool attackerWins = DetermineWinner(attackCard, defenseCard);
 
         if (attackerWins)
@@ -185,19 +204,30 @@ public class CombatManager : MonoBehaviour
             Debug.Log($"Defender takes {damageDifference} damage from power difference");
         }
 
-        // After combat effects
         combatUI.UpdatePhase(CombatUI.CombatPhase.AfterCombatEffects);
         ResolveEffects(CardEffectTiming.AfterCombat);
+        yield return new WaitForSeconds(1.5f);
 
-        // Wait for both selection and movement to complete
-        var movementUI = FindFirstObjectByType<MovementUI>();
-        while (movementUI != null && (!movementUI.IsMovementComplete || movementUI.IsSelectingUnit))
+        Debug.Log("Combat sequence complete, ending combat...");
+        EndCombat(attackerWins);
+    }
+
+    private void EndCombat(bool attackerWins)
+    {
+        Debug.Log($"Combat ended. Attacker {(attackerWins ? "wins!" : "loses!")}");
+
+        if (attacker is BaseUnit baseUnit)
         {
-            yield return null;
+            baseUnit.actionManager.EndAction();
         }
 
-        yield return new WaitForSeconds(0.5f);
-        EndCombat(attackerWins);
+        attackCard = null;
+        defendCard = null;
+        isWaitingForDefender = false;
+        attacker = null;
+        defender = null;
+
+        combatUI.ShowCombatUI(false);
     }
 
     private void ResolveEffects(CardEffectTiming timing)
@@ -221,38 +251,10 @@ public class CombatManager : MonoBehaviour
 
     private void ApplyDamage(MonoBehaviour target, int damage)
     {
-        if (target is Player player)
-            player.TakeDamage(damage);
-        else if (target is Enemy enemy)
-            enemy.TakeDamage(damage);
-        else if (target is Sidekick sidekick)
-            sidekick.TakeDamage(damage);
-    }
-
-    private void EndCombat(bool attackerWins)
-    {
-        Debug.Log($"Combat ended. Attacker {(attackerWins ? "wins!" : "loses!")}");
-
-        attackCard = null;
-        defendCard = null;
-        isWaitingForDefender = false;
-        attacker = null;
-        defender = null;
-
-        combatUI.ShowCombatUI(false);
-
-        // End the attacking action state for the appropriate unit
-        if (attacker is Player player)
-            player.actionManager.EndAction();
-        else if (attacker is Enemy enemy)
-            enemy.actionManager.EndAction();
-        else if (attacker is Sidekick sidekick)
-            sidekick.actionManager.EndAction();
-
-        var turnManager = FindFirstObjectByType<TurnManager>();
-        if (turnManager != null)
+        if (target is BaseUnit baseUnit)
         {
-            turnManager.PerformAction(TurnManager.ActionType.Attack);
+            baseUnit.TakeDamage(damage);
         }
     }
+
 }

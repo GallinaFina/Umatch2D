@@ -18,17 +18,25 @@ public class TurnManager : MonoBehaviour
 
     void Start()
     {
-
+        ServiceLocator.Instance.RegisterService(this);
     }
+
+    public void RegisterActionManager(ActionManager actionManager)
+    {
+        currentActions[actionManager.gameObject.GetComponent<MonoBehaviour>()] = ActionState.None;
+    }
+
 
     public void StartPlayerTurn()
     {
+        PathfindingUtility.ClearCache();
         actionsRemaining = 4;
         currentActions.Clear();
         player.SetStartingNode();
         player.actionManager.ResetTurn();
-        var sidekick = FindFirstObjectByType<Sidekick>();
-        if (sidekick && sidekick.owner == player)
+
+        var sidekick = ServiceLocator.Instance.GameManager.GetSidekickForOwner(player);
+        if (sidekick != null)
         {
             sidekick.actionManager.ResetTurn();
         }
@@ -45,7 +53,7 @@ public class TurnManager : MonoBehaviour
     {
         if (actionsRemaining > 0)
         {
-            if (!EffectManager.Instance.IsEffectComplete)
+            if (!ServiceLocator.Instance.EffectManager.IsEffectComplete)
             {
                 return;
             }
@@ -66,7 +74,7 @@ public class TurnManager : MonoBehaviour
 
     private IEnumerator WaitForEffectsThenEndTurn()
     {
-        while (!EffectManager.Instance.IsEffectComplete)
+        while (!ServiceLocator.Instance.EffectManager.IsEffectComplete)
         {
             yield return null;
         }
@@ -88,6 +96,5 @@ public class TurnManager : MonoBehaviour
     {
         Debug.Log("Player's turn ended.");
         currentActions.Clear();
-        // Logic for transitioning to enemy's turn will go here
     }
 }

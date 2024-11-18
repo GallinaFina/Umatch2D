@@ -13,6 +13,7 @@ public class SidekickPlacementUI : MonoBehaviour
 
     private void Start()
     {
+        ServiceLocator.Instance.RegisterService(this);
         confirmButton.onClick.AddListener(ConfirmPlacement);
         confirmationPanel.SetActive(false);
     }
@@ -53,8 +54,7 @@ public class SidekickPlacementUI : MonoBehaviour
 
     private void ResetAllNodeColors()
     {
-        var nodes = FindObjectsByType<Node>(FindObjectsInactive.Include, FindObjectsSortMode.None);
-        foreach (var node in nodes)
+        foreach (var node in ServiceLocator.Instance.Board.nodes)
         {
             var renderer = node.GetComponent<SpriteRenderer>();
             if (renderer != null)
@@ -67,7 +67,6 @@ public class SidekickPlacementUI : MonoBehaviour
     private void ConfirmPlacement()
     {
         ResetAllNodeColors();
-        var game = FindFirstObjectByType<Game>();
-        game.FinishSidekickPlacement();
+        ServiceLocator.Instance.GameManager.FinishSidekickPlacement();
     }
 }

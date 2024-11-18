@@ -5,7 +5,7 @@ using UnityEngine;
 public class SidekickData
 {
     public string name;
-    public Player.CombatType combatType;
+    public CombatType combatType;
     public int health;
 }
 

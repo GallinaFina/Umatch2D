@@ -1,22 +1,21 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.Linq;
+using static CombatType;
+
 
 public class Game : MonoBehaviour
 {
     [SerializeField] private GameObject playerTokenPrefab;
     [SerializeField] private GameObject enemyTokenPrefab;
     [SerializeField] private GameObject sidekickTokenPrefab;
-    [SerializeField] private SidekickPlacementUI placementUI;
+    [SerializeField] public SidekickPlacementUI placementUI;
 
     public Player player;
     public Enemy enemy;
-    private DeckManager deckManager;
-    private Board board;
     public HandDisplay handDisplay;
     public CombatManager combatManager;
-    public TurnManager turnManager;
-
+    public CombatUI combatUI;
     public GameState currentState = GameState.Setup;
     private List<Sidekick> sidekicksToPlace = new List<Sidekick>();
 
@@ -29,11 +28,13 @@ public class Game : MonoBehaviour
 
     void Start()
     {
-        board = FindFirstObjectByType<Board>();
-        deckManager = FindFirstObjectByType<DeckManager>();
-        turnManager = FindFirstObjectByType<TurnManager>();
+        ServiceLocator.Instance.RegisterService(this);
+        InitializeGame();
+    }
 
-        InitializePlayer("NodeN", Player.CombatType.Melee);
+    private void InitializeGame()
+    {
+        InitializePlayer("NodeN", CombatType.Melee);
         InitializeSidekicks();
         StartSidekickPlacement();
 
@@ -41,25 +42,23 @@ public class Game : MonoBehaviour
         InitializeEnemySidekicks();
         DrawInitialHand(enemy, 5);
 
-        // Set references in TurnManager
-        turnManager.player = player;
-        turnManager.enemy = enemy;
+        ServiceLocator.Instance.TurnManager.player = player;
+        ServiceLocator.Instance.TurnManager.enemy = enemy;
 
-        if (combatManager != null)
+        if (ServiceLocator.Instance.CombatManager != null)
         {
-            combatManager.player = player;
-            combatManager.enemy = enemy;
+            ServiceLocator.Instance.CombatManager.player = player;
+            ServiceLocator.Instance.CombatManager.enemy = enemy;
         }
 
         DrawInitialHand(player, 5);
     }
 
-
     void Update()
     {
         if (Input.GetKeyDown(KeyCode.M))
         {
-            if (turnManager.CanPerformAction())
+            if (ServiceLocator.Instance.TurnManager.CanPerformAction())
             {
                 player.Maneuver();
                 handDisplay.DisplayHand(player.hand, player.SelectCard);
@@ -68,11 +67,7 @@ public class Game : MonoBehaviour
 
         if (Input.GetKeyDown(KeyCode.E))
         {
-            var movementUI = FindFirstObjectByType<MovementUI>();
-            if (movementUI != null)
-            {
-                movementUI.ResetMovedUnits();
-            }
+            ServiceLocator.Instance.MovementUI?.ResetMovedUnits();
 
             if (player != null)
             {
@@ -111,7 +106,7 @@ public class Game : MonoBehaviour
     private void PlaceEnemySidekick(Sidekick sidekick)
     {
         var enemyStartZone = enemy.GetStartingNode().zones;
-        var validNodes = board.nodes
+        var validNodes = ServiceLocator.Instance.Board.nodes
             .Where(node => node.zones.Intersect(enemyStartZone).Any() && !node.IsOccupied())
             .ToList();
 
@@ -160,7 +155,7 @@ public class Game : MonoBehaviour
 
     public void FinishSidekickPlacement()
     {
-        foreach (Node node in board.nodes)
+        foreach (Node node in ServiceLocator.Instance.Board.nodes)
         {
             node.Highlight(false);
             var renderer = node.GetComponent<SpriteRenderer>();
@@ -172,13 +167,13 @@ public class Game : MonoBehaviour
 
         placementUI.ShowPlacementUI(false);
         currentState = GameState.Playing;
-        turnManager.StartPlayerTurn();
+        ServiceLocator.Instance.TurnManager.StartPlayerTurn();
     }
 
     private void HighlightValidPlacementZones()
     {
         var playerStartZone = player.GetStartingNode().zones;
-        foreach (Node node in board.nodes)
+        foreach (Node node in ServiceLocator.Instance.Board.nodes)
         {
             if (IsValidSidekickPlacement(node, playerStartZone))
             {
@@ -192,15 +187,16 @@ public class Game : MonoBehaviour
         return node.zones.Intersect(ownerZones).Any() && !node.IsOccupied();
     }
 
-    private void InitializePlayer(string startNodeName, Player.CombatType type)
+    private void InitializePlayer(string startNodeName, CombatType type)
     {
+        var deckManager = ServiceLocator.Instance.DeckManager;
         Deck chosenDeck = deckManager.GetDeck("Bigfoot");
 
         GameObject playerToken = Instantiate(playerTokenPrefab, Vector3.zero, Quaternion.identity);
         player = playerToken.GetComponent<Player>();
 
         player.Initialize(chosenDeck, type);
-        player.currentNode = board.GetNodeByName(startNodeName);
+        player.currentNode = ServiceLocator.Instance.Board.GetNodeByName(startNodeName);
         player.SetStartingNode();
 
         playerToken.transform.position = player.currentNode.transform.position;
@@ -208,13 +204,14 @@ public class Game : MonoBehaviour
 
     private void InitializeEnemy(string startNodeName)
     {
+        var deckManager = ServiceLocator.Instance.DeckManager;
         Deck chosenDeck = deckManager.GetDeck("Bigfoot");
 
         GameObject enemyToken = Instantiate(enemyTokenPrefab, Vector3.zero, Quaternion.identity);
         enemy = enemyToken.GetComponent<Enemy>();
 
         enemy.Initialize(chosenDeck);
-        enemy.currentNode = board.GetNodeByName(startNodeName);
+        enemy.currentNode = ServiceLocator.Instance.Board.GetNodeByName(startNodeName);
         enemy.SetStartingNode();
 
         enemyToken.transform.position = enemy.currentNode.transform.position;
@@ -222,23 +219,14 @@ public class Game : MonoBehaviour
 
     private void DrawInitialHand(Player player, int handSize)
     {
-        Debug.Log($"HandDisplay reference: {handDisplay != null}");
-        Debug.Log($"Player reference: {player != null}");
-        Debug.Log($"Player hand: {player.hand != null}");
-
         player.hand = new List<Card>();
-        Debug.Log("Drawing initial hand for player...");
 
         for (int i = 0; i < handSize; i++)
         {
             player.DrawCard();
         }
 
-        Debug.Log("Player's hand after initial draw: " + string.Join(", ", player.hand.Select(card => card.name)));
-        Debug.Log($"Card count in hand: {player.hand.Count}");
-
         handDisplay.DisplayHand(player.hand, OnCardDiscarded);
-        Debug.Log("Displayed player's initial hand.");
     }
 
     private void DrawInitialHand(Enemy enemy, int handSize)
@@ -255,5 +243,11 @@ public class Game : MonoBehaviour
     {
         player.BoostManeuver(card);
         handDisplay.DisplayHand(player.hand, OnCardDiscarded);
+    }
+
+    public Sidekick GetSidekickForOwner(MonoBehaviour owner)
+    {
+        return FindObjectsByType<Sidekick>(FindObjectsSortMode.None)
+            .FirstOrDefault(s => s.owner == owner);
     }
 }
